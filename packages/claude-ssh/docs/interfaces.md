@@ -4,7 +4,7 @@
 
 已检查仓库至文件系统根路径沿途的 AGENTS.md；没有额外项目文件。执行用户提供的全局指令。开始时仓库只有初始化提交。
 
-以下接口均来自本机安装包的 `lib/types/*.d.ts` 与必要的 `lib/index.js` / `lib/client.js`，依赖版本锁定在 package-lock.json：
+以下接口均来自本机安装包的 `lib/types/*.d.ts` 与必要的 `lib/index.js` / `lib/client.js`，依赖版本锁定在仓库根目录的 pnpm-lock.yaml（由原 package-lock.json 迁移）：
 
 | 包 / 文件 | 使用的公开接口 |
 |---|---|
