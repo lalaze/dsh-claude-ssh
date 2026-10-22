@@ -47,7 +47,7 @@ function NativeModels() {
   const [directory] = useState<Directory>(() => {
     const listeners = new Set<() => void>();
     let state: ReturnType<Directory['store']['getSnapshot']> = { current: null, status: 'ready', error: null, groups: [
-      { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'chat', name: 'DeepSeek Chat', reasoning: { efforts: [{ id: 'high', name: 'High' }] } }] },
+      { id: 'deepseek', name: 'Magpie · Responses', models: [{ id: 'chat', name: 'GPT-6.1-Sol · Codex · Remote magpie', reasoning: { efforts: [{ id: 'high', name: 'High' }] } }] },
       { id: 'claude-workspace', name: 'Claude', models: ['sonnet', 'opus', 'haiku'].map(id => ({ id, name: `Claude ${id}` })) },
       { id: 'claude-ssh-other', name: 'Other host', models: [{ id: 'sonnet', name: 'Legacy Claude' }] },
     ] };
@@ -58,9 +58,16 @@ function NativeModels() {
     await new Promise(resolve => setTimeout(resolve, id === 'remote' ? (window as Window & { nativeDelay?: number }).nativeDelay ?? 120 : 20));
     return { eligible: id === 'remote' };
   });
-  return <section id="native-models" style={{ padding: 24 }}><button id="remote-project" onClick={() => setSessionId('remote')}>Target remote project</button>
+  return <section id="native-models" style={{ padding: 24, maxWidth: 760, margin: 'auto' }}><button id="remote-project" onClick={() => setSessionId('remote')}>Target remote project</button>
     <button id="local-project" onClick={() => setSessionId('local')}>Local project</button>
-    <ModelPicker key={sessionId} sessionId={sessionId} directory={directory} available check={check} />
+    <div style={{ marginTop: 24, padding: 16, borderRadius: 24, background: '#2a2a2c', containerType: 'inline-size' }}>
+      <div style={{ height: 96, color: '#808088', fontSize: 15 }}>描述你想要构建的内容，/ 调用指令，@ 文件或对话</div>
+      <div id="composer-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+        <span style={{ fontSize: 22 }}>＋</span><span id="permission-trigger" style={{ whiteSpace: 'nowrap', fontSize: 13, color: '#bbb' }}>工作区内修改⌄</span>
+        <div style={{ marginLeft: 'auto', minWidth: 0 }}><ModelPicker key={sessionId} sessionId={sessionId} directory={directory} available check={check} /></div>
+        <span style={{ flex: 'none', width: 28, height: 28, display: 'grid', placeItems: 'center', background: '#496086', borderRadius: '50%' }}>↑</span>
+      </div>
+    </div>
     <output id="native-selection">{selected}</output>
   </section>;
 }

@@ -48,7 +48,7 @@ Install an individual built archive into the desired DSH profile:
 
 ```sh
 pnpm pack:plugins
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.0.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.1.tgz"
 ```
 
 For Desktop, fully quit DSH and use `--profile desktop`, then reopen the app. For Web, restart the updated profile and refresh the browser. Plugins are not currently published to npm. The repository root is a private workspace; install individual plugin archives rather than the GitHub root.

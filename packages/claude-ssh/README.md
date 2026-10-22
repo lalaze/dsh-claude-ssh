@@ -18,7 +18,7 @@ cd dsh-plugins
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-claude-ssh check
 corepack pnpm --filter dsh-claude-ssh pack:plugin
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.0.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.1.tgz"
 ```
 
 For **DSH Desktop**, open the application once to initialize its profile, fully quit it, then use `--profile desktop` instead of `--profile web` in the installation command. Reopen the desktop application after installation.

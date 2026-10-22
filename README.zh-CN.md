@@ -48,7 +48,7 @@ pnpm --filter dsh-claude-ssh pack:plugin
 
 ```sh
 pnpm pack:plugins
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.0.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.1.tgz"
 ```
 
 桌面端请完全退出 DSH，将参数改为 `--profile desktop` 后安装并重新打开。Web 端请重启更新的 profile 并刷新浏览器。插件目前未发布到 npm。仓库根目录是私有工作区，安装时应使用各插件的压缩包。

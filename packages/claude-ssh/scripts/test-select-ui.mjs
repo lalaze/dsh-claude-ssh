@@ -125,26 +125,52 @@ try {
       if (document.querySelector('.dsh-ssh-select-panel')) throw new Error('Escape did not close the Codex popup');`);
     console.log('PASS: installed Codex UI settings component mouse open/select, search, Enter, Escape, focus containment and no label reactivation');
   }
-  click('#native-models [aria-label="模型"]');
-  browser('wait', '--fn', 'Array.from(document.querySelectorAll("#native-models [role=option]")).filter(e=>e.textContent.includes("Claude")).length===3');
-  evaluate(`if (document.querySelector('#native-models [role=listbox]').textContent.includes('Legacy Claude')) throw new Error('Cross-host legacy model leaked');`);
+  const openModels = () => {
+    click('#native-models [aria-label="选择模型"]');
+    if (!evaluate(`Boolean(document.querySelector('#native-models [role=searchbox]'))`)) click('#native-models [role=menuitem]');
+  };
+  openModels();
+  browser('wait', '--fn', 'Array.from(document.querySelectorAll("#native-models [role=menuitemradio]")).filter(e=>e.textContent.includes("Claude")).length===3');
+  evaluate(`if (document.querySelector('#native-models [role=menu]').textContent.includes('Legacy Claude')) throw new Error('Cross-host legacy model leaked');`);
   browser('fill', '#native-models [role=searchbox]', 'opus'); browser('press', 'Enter');
   browser('wait', '--fn', 'document.getElementById("native-selection").textContent.includes("opus")');
   click('#local-project');
-  click('#native-models [aria-label="模型"]');
-  evaluate(`if (document.querySelector('#native-models [role=listbox]').textContent.includes('Claude')) throw new Error('Claude leaked into local project');`);
-  click('#native-models [role=option]');
-  click('#native-models [aria-label="推理等级"]');
-  click('#native-models [role=option]:nth-child(2)');
+  openModels();
+  evaluate(`if (document.querySelector('#native-models [role=menu]').textContent.includes('Claude')) throw new Error('Claude leaked into local project');`);
+  click('#native-models [role=menuitemradio]');
+  click('#native-models [aria-label="选择模型"]');
+  click('#native-models [role=menuitem]:nth-child(2)');
+  click('#native-models [role=menuitemradio]:nth-child(2)');
   evaluate(`if (!document.getElementById('native-selection').textContent.includes('high')) throw new Error('Other provider reasoning selection broke');`);
+  evaluate(`const button=document.querySelector('#native-models .dsh-cm-trigger'), style=getComputedStyle(button), rect=button.getBoundingClientRect();
+    if (rect.height!==28 || rect.width>360 || style.borderTopWidth!=='0px' || style.backgroundColor!=='rgba(0, 0, 0, 0)') throw new Error('Native compact borderless trigger changed');
+    if (button.textContent.includes('Responses') || button.textContent.includes('Magpie ·')) throw new Error('Provider label duplicated in trigger');
+    if (document.querySelectorAll('#native-models .dsh-cm-trigger').length!==1 || document.querySelector('#native-models [role=combobox]')) throw new Error('Separate large selectors returned');
+    const left=document.getElementById('permission-trigger').getBoundingClientRect();
+    if (Math.abs((left.top+left.bottom)/2-(rect.top+rect.bottom)/2)>1) throw new Error('Model entry wrapped to a second toolbar row');`);
+  // The existing entrance opens the same two settings, rather than separate input controls.
+  click('#native-models [aria-label="选择模型"]');
+  evaluate(`const rows=[...document.querySelectorAll('#native-models [role=menuitem]')];
+    if(rows.length!==2 || !rows[0].textContent.startsWith('模型') || !rows[1].textContent.startsWith('推理等级')) throw new Error('Two-level native menu changed');`);
+  browser('press', 'Escape');
   // A remote probe is deliberately slower than the local one: its late result must not
   // make the shared model catalog visible in the next project's menu.
   evaluate('window.nativeDelay = 1500');
-  click('#remote-project'); click('#native-models [aria-label="模型"]'); browser('press', 'Escape'); click('#local-project');
-  click('#native-models [aria-label="模型"]');
+  click('#remote-project'); openModels(); browser('press', 'Escape'); browser('press', 'Escape'); click('#local-project');
+  openModels();
   evaluate('new Promise(resolve => setTimeout(resolve, 1600))');
-  evaluate(`if (document.querySelector('#native-models [role=listbox]').textContent.includes('Claude')) throw new Error('Stale remote eligibility leaked across sessions');`);
-  browser('press', 'Escape');
+  evaluate(`if (document.querySelector('#native-models [role=menu]').textContent.includes('Claude')) throw new Error('Stale remote eligibility leaked across sessions');`);
+  browser('press', 'Escape'); browser('press', 'Escape');
+  browser('set', 'viewport', '390', '720');
+  evaluate(`const button=document.querySelector('#native-models .dsh-cm-trigger'), rect=button.getBoundingClientRect(), label=button.querySelector('.dsh-cm-name');
+    if (rect.right>innerWidth || rect.height!==28 || getComputedStyle(label).textOverflow!=='ellipsis') throw new Error('Compact model label overflows on narrow screens');`);
+  if (process.env.DSH_TEST_UI_SCREENSHOT) {
+    browser('set', 'viewport', '960', '600');
+    evaluate(`document.querySelectorAll('main > :not(#native-models),#native-models > button,#native-selection').forEach(e=>e.style.display='none'); document.getElementById('native-models').style.marginTop='140px'; document.activeElement.blur(); window.scrollTo(0,0)`);
+    browser('screenshot', process.env.DSH_TEST_UI_SCREENSHOT);
+    click('#native-models [aria-label="选择模型"]');
+    browser('screenshot', process.env.DSH_TEST_UI_SCREENSHOT.replace(/\.png$/, '-menu.png'));
+  }
   console.log('PASS: target-only Claude models, native selection, other-provider reasoning, no cross-host models or stale eligibility after project switch');
   console.log('PASS: same-document, separate-document and modal mouse open/select, viewport placement, focus, search, Enter, Escape, outside click');
 } catch (error) {

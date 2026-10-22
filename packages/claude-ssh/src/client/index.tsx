@@ -10,7 +10,7 @@ import { NATIVE_PROVIDER } from './model-filter.js';
 import type { Eligibility } from '../native.js';
 
 // Narrow views of public 0.2.1-rc.2 client faces; source locations are documented in docs/interfaces.md.
-type Props = { sessionId?: string; matched?: { sessionId: string }; close?: () => void; useProjection?: (key: string, select: (v: any) => any) => any; useSession?: (select: (v: any) => any) => any };
+type Props = { sessionId?: string; locked?: boolean; matched?: { sessionId: string }; close?: () => void; useProjection?: (key: string, select: (v: any) => any) => any; useSession?: (select: (v: any) => any) => any };
 interface Client {
   slots: { inject(name: string, factory: () => unknown): unknown; register(spec: Record<string, unknown>, component: React.FC<Props>): unknown };
   uiWorkspace: { openSession(id: string): void };
@@ -191,7 +191,7 @@ export async function apply(ctx: Client): Promise<void> {
     const { data } = useStateData();
     if (!props.sessionId) return null;
     const binding = data?.bindings[props.sessionId];
-    return <ModelPicker key={props.sessionId} sessionId={props.sessionId} directory={ctx.modelDirectories.directoryFor(props.sessionId)}
+    return <ModelPicker key={props.sessionId} sessionId={props.sessionId} locked={props.locked} directory={ctx.modelDirectories.directoryFor(props.sessionId)}
       available={ctx.sessions.subagentAddress(props.sessionId) === undefined} legacyHostId={data?.routeErrors?.[props.sessionId] ? undefined : binding?.hostId} targetsKey={JSON.stringify(data?.hosts ?? [])} check={checkWorkspace} />;
   };
   ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: 'claude-ssh', order: 65, label: () => 'Claude SSH' }, Settings));
