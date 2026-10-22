@@ -6,11 +6,12 @@ const mismatch = (version?: string): Error => new Error(`Claude SSH 后端${vers
 
 export async function loadSshAliases(request: (body?: unknown) => Promise<unknown>): Promise<SshAliases> {
   const state = await request() as StateView;
-  if (!state.plugin || state.plugin.version !== PLUGIN_VERSION) throw mismatch(state.plugin?.version);
-  if (!state.plugin.capabilities.includes('sshAliases')) throw new Error('当前后端不支持 SSH 列表，请重新安装插件并完全退出、重启 DSH。');
+  if (!state.plugin) throw mismatch();
+  if (!state.plugin.capabilities?.includes('sshAliases')) throw new Error('当前后端不支持 SSH 列表，请重新安装插件并完全退出、重启 DSH。');
   try {
     const result = await request({ action: 'sshAliases' }) as SshAliases;
     if (!result || !Array.isArray(result.aliases) || !result.aliases.every(a => typeof a === 'string') || !Array.isArray(result.warnings)) throw new Error('SSH 列表响应格式无效，请核对前后端插件版本。');
+    if (state.plugin.version !== PLUGIN_VERSION) return { ...result, warnings: [...result.warnings, `界面 ${PLUGIN_VERSION} / 后端 ${state.plugin.version}：SSH 列表接口兼容，可以正常选择；建议重启完成插件更新。`] };
     return result;
   } catch (e) {
     if (e instanceof Error && e.message === '未知操作') throw mismatch(state.plugin.version);

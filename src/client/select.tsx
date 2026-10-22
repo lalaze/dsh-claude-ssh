@@ -24,7 +24,7 @@ function Icon({ name }: { name: 'chevron' | 'search' | 'check' | 'ssh' }) {
   </svg>;
 }
 
-/** Themed, searchable listbox; the portal avoids clipping inside DSH settings. */
+/** Use the trigger's document: settings may render in a separate window/document. */
 export function Select({ value, options, onValueChange, placeholder = '请选择', disabled, searchable, kind, style, 'aria-label': label }: SelectProps): React.ReactElement {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -48,32 +48,40 @@ export function Select({ value, options, onValueChange, placeholder = '请选择
 
   useLayoutEffect(() => {
     if (!open) return;
+    const doc = trigger.current?.ownerDocument;
+    const view = doc?.defaultView;
+    if (!doc || !view) return;
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect();
       if (!rect) return;
-      const below = window.innerHeight - rect.bottom - 12;
+      const below = view.innerHeight - rect.bottom - 12;
       const above = rect.top - 12;
       const upward = below < 220 && above > below;
       const maxHeight = Math.min(360, Math.max(120, upward ? above : below));
-      const width = Math.min(Math.max(rect.width, 220), 420, window.innerWidth - 24);
-      setPosition({ width, maxHeight, left: Math.max(12, Math.min(rect.left, window.innerWidth - width - 12)), ...(upward ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) });
+      const width = Math.min(Math.max(rect.width, 220), 420, view.innerWidth - 24);
+      setPosition({ width, maxHeight, left: Math.max(12, Math.min(rect.left, view.innerWidth - width - 12)), ...(upward ? { bottom: view.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }) });
     };
     place();
     const scroll = (event: Event) => { if (!panel.current?.contains(event.target as Node)) place(); };
-    window.addEventListener('resize', place);
-    document.addEventListener('scroll', scroll, true);
-    const frame = requestAnimationFrame(() => { if (searchable) search.current?.focus(); });
-    return () => { cancelAnimationFrame(frame); window.removeEventListener('resize', place); document.removeEventListener('scroll', scroll, true); };
+    view.addEventListener('resize', place);
+    doc.addEventListener('scroll', scroll, true);
+    const frame = view.requestAnimationFrame(() => { if (searchable) search.current?.focus(); });
+    return () => { view.cancelAnimationFrame(frame); view.removeEventListener('resize', place); doc.removeEventListener('scroll', scroll, true); };
   }, [open, searchable]);
   useEffect(() => {
     if (!open) return;
+    const doc = trigger.current?.ownerDocument;
+    const view = doc?.defaultView;
+    if (!doc || !view) return;
     const outside = (event: Event) => {
       const target = event.target as Node;
       if (!trigger.current?.contains(target) && !panel.current?.contains(target)) setOpen(false);
     };
-    document.addEventListener('pointerdown', outside, true);
-    document.addEventListener('focusin', outside);
-    return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('focusin', outside); };
+    const blur = () => setOpen(false);
+    doc.addEventListener('pointerdown', outside, true);
+    doc.addEventListener('focusin', outside);
+    view.addEventListener('blur', blur);
+    return () => { doc.removeEventListener('pointerdown', outside, true); doc.removeEventListener('focusin', outside); view.removeEventListener('blur', blur); };
   }, [open]);
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
   useEffect(() => { if (open) list.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' }); }, [activeIndex, query, open]);
@@ -100,7 +108,7 @@ export function Select({ value, options, onValueChange, placeholder = '请选择
       <span className="dsh-ssh-select-value" data-placeholder={!selected}>{selected?.label ?? placeholder}</span>
       <span className="dsh-ssh-select-chevron"><Icon name="chevron" /></span>
     </button>
-    {open && createPortal(<div ref={panel} className="dsh-ssh-select-panel" style={position} onKeyDown={navigate}>
+    {open && trigger.current && createPortal(<div ref={panel} className="dsh-ssh-select-panel" style={position} onKeyDown={navigate}>
       {searchable && <div className="dsh-ssh-select-search"><Icon name="search" /><input ref={search} aria-label={`搜索${label}`} role="searchbox" aria-controls={`${id}-list`} aria-activedescendant={filtered[activeIndex] ? `${id}-option-${activeIndex}` : undefined} placeholder="搜索 SSH 别名…" value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} /><kbd>esc</kbd></div>}
       <div ref={list} className="dsh-ssh-select-list" role="listbox" id={`${id}-list`} aria-label={label}>
         {filtered.map((option, index) => <div key={option.value} id={`${id}-option-${index}`} className="dsh-ssh-select-option" role="option" aria-selected={option.value === value} data-active={index === activeIndex} onPointerMove={() => setActive(index)} onPointerDown={event => event.preventDefault()} onClick={() => choose(option)}>
@@ -111,6 +119,6 @@ export function Select({ value, options, onValueChange, placeholder = '请选择
         {filtered.length === 0 && <div className="dsh-ssh-select-empty" role="status">没有匹配的连接</div>}
       </div>
       {searchable && <div className="dsh-ssh-select-footer"><span>{filtered.length} 个连接</span><span>↑↓ 选择 <span className="dsh-ssh-select-hint">↵ 确认</span></span></div>}
-    </div>, document.body)}
+    </div>, trigger.current.ownerDocument.body)}
   </span>;
 }

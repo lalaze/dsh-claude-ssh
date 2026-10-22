@@ -32,4 +32,4 @@
 
 Claude 协议来源：本机 CLI `2.1.304 --help` 只用于核对参数；运行时的检测和登录判断一律通过目标 SSH 用户执行。外部来源包括 [官方 CLI reference](https://code.claude.com/docs/en/cli-reference) 和 [官方 Python Agent SDK 的控制协议实现](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py)。CLI stdio 控制协议随版本可能变化，运行时拒绝不支持的参数或不识别的状态，不静默降级。
 
-0.1.3 下拉弹层通过公开 React DOM `createPortal` 挂载到 document.body；已核对 DSH 自带客户端模块同样使用 ModuleLoader 的 `react-dom` 外部模块。样式使用实际主题包中的 `--dsw-alias-bg-layer-*`、`--dsw-alias-label-*`、`--dsw-alias-border-*` 与交互颜色令牌，并提供回退颜色。
+当前下拉弹层通过公开 React DOM `createPortal` 挂载到触发按钮 ownerDocument.body，并以所属窗口的视口和事件监听定位；已核对 DSH 自带客户端模块同样使用 ModuleLoader 的 `react-dom` 外部模块。样式使用实际主题包中的 `--dsw-alias-bg-layer-*`、`--dsw-alias-label-*`、`--dsw-alias-border-*` 与交互颜色令牌，并提供回退颜色。

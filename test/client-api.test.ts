@@ -28,8 +28,22 @@ test('当前后端成功读取与刷新；返回真实配置路径，保留已�
   assert.match(aliasPlaceholder(true, undefined), /正在读取/);
 });
 
-test('前后端版本不一致或能力缺失时不向后端发送不支持的操作', async () => {
-  for (const plugin of [{ version: '0.1.0', capabilities: ['sshAliases'] }, { version: PLUGIN_VERSION, capabilities: [] }]) {
+test('前后端补丁版本不同但 SSH 列表接口兼容时，仍可刷新并启用下拉', async () => {
+  for (const version of ['0.1.2', '0.1.3', '0.1.99']) {
+    const actions: unknown[] = [];
+    const result = await loadSshAliases(async body => {
+      actions.push(body);
+      if (body === undefined) return { ...currentState(), plugin: { ...currentState().plugin, version } };
+      return { aliases: ['configured-host'], warnings: [] };
+    });
+    assert.deepEqual(result.aliases, ['configured-host']);
+    assert.deepEqual(actions, [undefined, { action: 'sshAliases' }]);
+    assert.ok(result.warnings.some(w => w.includes(version)));
+  }
+});
+
+test('缺失 SSH 列表能力时不向后端发送不支持的操作', async () => {
+  for (const plugin of [{ version: '0.1.0', capabilities: [] }, { version: PLUGIN_VERSION, capabilities: [] }]) {
     await assert.rejects(loadSshAliases(async body => {
       assert.equal(body, undefined);
       return { ...currentState(), plugin };
