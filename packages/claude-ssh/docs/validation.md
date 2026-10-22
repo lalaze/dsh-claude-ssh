@@ -1,5 +1,15 @@
 # 本次验证记录
 
+## 0.2.0 原生工作区验收（2026-10-22）
+
+- `pnpm --filter dsh-claude-ssh check`：类型检查、39 项测试、服务端及客户端构建通过。
+- 原生工作区测试通过真实 shell/Claude 协议夹具验证 cwd 映射、自动会话绑定、Sonnet/Haiku 切换、持久续接、主机/目录变更拒绝、登录失败、停止与恢复不重发。
+- `pnpm --filter dsh-claude-ssh test:ui`：目标项目显示三种 Claude 模型，本机与其他主机隐藏；其他模型及推理等级可选择；切换项目后迟到的远程验证结果不会污染新项目。已有主文档、独立设置文档和模态弹层回归也通过。
+- 实际 DSH 0.2.1-rc.2：用安装包建立独立临时 Web profile，确认插件 API、原生模型插槽挂载、模型目录服务以及 subprocess 环境探测可用；本机项目返回不可用且下拉没有 Claude 选项。该检查发现并修复了 Cordis 的 `remote.session` 与 `subprocess` 注入声明问题。
+- 所有浏览器回归使用独立临时 automation profile，结束后检查无残留 agent-browser 进程。临时 DSH 服务已停止。
+- 未连接用户截图中的 DSH 实例，未在其真实远程工作区发起付费 Claude 调用，也未替用户安装更新。真实远程工作区仍须由其 DSH subprocess 提供者完成路由；仅有远程文件面板不足以满足此模式。
+
+
 日期：2026-10-21。目标为 macOS 本机经真实 OpenSSH 回环连接；没有将协议夹具称为真实 Claude 验证。
 
 ## 构建与自动测试

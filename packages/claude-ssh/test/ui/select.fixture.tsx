@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import * as ReactDOM from 'react-dom';
 import * as JSXRuntime from 'react/jsx-runtime';
 import { Select } from '../../src/client/select.js';
+import { ModelPicker, type Directory } from '../../src/client/model-picker.js';
 
 declare const __CODEX_CLIENT_SOURCE__: string;
 let CodexSettingsPage: React.FC<any> | undefined;
@@ -40,12 +41,35 @@ function ModalPicker() {
       <Picker id="modal-picker" /><button id="close-modal" onClick={() => dialog.current?.close()}>Close modal</button>
     </dialog></>;
 }
+function NativeModels() {
+  const [sessionId, setSessionId] = useState('remote');
+  const [selected, setSelected] = useState('');
+  const [directory] = useState<Directory>(() => {
+    const listeners = new Set<() => void>();
+    let state: ReturnType<Directory['store']['getSnapshot']> = { current: null, status: 'ready', error: null, groups: [
+      { id: 'deepseek', name: 'DeepSeek', models: [{ id: 'chat', name: 'DeepSeek Chat', reasoning: { efforts: [{ id: 'high', name: 'High' }] } }] },
+      { id: 'claude-workspace', name: 'Claude', models: ['sonnet', 'opus', 'haiku'].map(id => ({ id, name: `Claude ${id}` })) },
+      { id: 'claude-ssh-other', name: 'Other host', models: [{ id: 'sonnet', name: 'Legacy Claude' }] },
+    ] };
+    return { store: { getSnapshot: () => state, subscribe: listener => { listeners.add(listener); return () => { listeners.delete(listener); }; } }, load: async () => {},
+      select: async selection => { state = { ...state, current: selection }; setSelected(JSON.stringify(selection)); for (const listener of listeners) listener(); } };
+  });
+  const [check] = useState(() => async (id: string) => {
+    await new Promise(resolve => setTimeout(resolve, id === 'remote' ? (window as Window & { nativeDelay?: number }).nativeDelay ?? 120 : 20));
+    return { eligible: id === 'remote' };
+  });
+  return <section id="native-models" style={{ padding: 24 }}><button id="remote-project" onClick={() => setSessionId('remote')}>Target remote project</button>
+    <button id="local-project" onClick={() => setSessionId('local')}>Local project</button>
+    <ModelPicker key={sessionId} sessionId={sessionId} directory={directory} available check={check} />
+    <output id="native-selection">{selected}</output>
+  </section>;
+}
 function Fixture() {
   const [frameDoc, setFrameDoc] = useState<Document>();
   return <main><p>UI regression fixture only — no SSH connections or model calls.</p><Picker id="main-picker" />
     <iframe id="settings-frame" title="Separate settings document" style={{ width: 720, height: 480, border: 0 }} srcDoc={'<!doctype html><html><head><style>body{margin:0;font:14px system-ui;background:#222;color:#eee}label{display:grid;gap:8px}output{display:block;min-height:24px}</style></head><body></body></html>'} onLoad={event => setFrameDoc(event.currentTarget.contentDocument ?? undefined)} />
     {frameDoc && createPortal(<Picker id="frame-picker" />, frameDoc.body)}
-    <ModalPicker />
+    <ModalPicker /><NativeModels />
     {CodexSettingsPage && <CodexSettingsPage wide sections={sections} onboarding={onboarding} connectionState={connectionState} reconnect={() => {}} useSessions={(select: (state: unknown) => unknown) => select({ phase: 'loading' })} t={(key: string) => key} renderSlot={(name: string) => name === 'settings.trigger' ? 'Open Codex settings' : name === 'settings.section' ? <Picker id="codex-picker" /> : null} />}
   </main>;
 }

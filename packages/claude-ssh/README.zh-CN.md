@@ -2,7 +2,7 @@
 
 [English](README.md) | **简体中文**
 
-`dsh-claude-ssh` 是 DeepSeek Harness 的 TypeScript 插件。在本机 DSH Web 界面，通过系统 OpenSSH 使用目标机器上已经安装、登录的 Claude Code。
+`dsh-claude-ssh` 是 DeepSeek Harness 的 TypeScript 插件。在现有远程项目中，从模型菜单选择目标机器上已经安装、登录的 Claude Code。原生模式沿用 DSH 工作区的进程服务，系统 OpenSSH 用于核对已配置目标；兼容模式保留独立 SSH 执行。
 
 远端 Claude 自己执行智能体循环、工具、文件操作和终端命令。本机展示 stream-json 事件，转发 DSH 权限确认、用户问题与取消，不需要远端安装 DSH 或额外服务。
 
@@ -18,7 +18,7 @@ cd dsh-plugins
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-claude-ssh check
 corepack pnpm --filter dsh-claude-ssh pack:plugin
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.7.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.0.tgz"
 ```
 
 安装到 **DSH 桌面端**：先打开应用一次以初始化 profile，完全退出后，将上述命令的 `--profile web` 改为 `--profile desktop` 执行，再重新打开桌面应用。
@@ -36,10 +36,20 @@ Web 端请重启对应 DSH profile，然后刷新浏览器。设置菜单中应�
 1. 打开 DSH 设置 → **Claude SSH**。
 2. 在“从本机 SSH 配置选择”中选择已有连接，也可手动填写 SSH 别名或 `user@host`。选择别名会填入 SSH 目标，并为空白新主机补上标识和名称；仍需点击保存。可选填端口和 Claude 绝对路径。
 3. 点击“测试连接与 Claude”。这会在真实非交互 SSH 环境检测目标用户、二进制、版本、登录状态和必要 CLI 参数，**不调用模型**。
-4. 选择已保存主机，浏览或输入远端绝对路径，点击“保存远程工作区”。空目录也可以使用。路径必须实际存在、可读且可进入；`~` 不会自动展开。
-5. 在已保存工作区中选择 `sonnet`、`opus` 或 `haiku`（Claude CLI 模型别名，实际模型由远端解析），点击“创建远程会话”。
-6. 在 DSH 会话中发送文本。输入框上方持续显示 **主机（SSH 目标） / 远端用户 / 远端真实目录**，另显示 Claude session ID 与状态。
-7. Claude 需要权限或通过 AskUserQuestion 询问用户时，在 DSH 的原生确认界面作答。权限为单次决定；不可用、关闭或取消时拒绝。远端已有 Claude 权限规则仍由 CLI 执行。
+4. 在 DSH 左侧选择已经添加的远程项目，照常新建或打开对话。
+5. 打开原生位置的模型下拉菜单。只有当前工作区通过目标主机验证、且该环境中的 Claude 已登录可用时，才出现 **Claude Sonnet / Opus / Haiku**。本机项目、其他主机、验证中或验证失败时不展示这些选项。
+6. 选择 Claude 后直接使用原来的输入框。首次发送自动保存会话执行身份；随后沿用同一个 Claude session ID。无需再保存一份工作区或创建专用会话。
+7. Claude 的权限和 AskUserQuestion 仍由 DSH 原生确认界面处理；取消沿用原生停止按钮。
+
+### 原生工作区接入条件
+
+与 oh-my-claude 的 `spawn: dsh` 路径一样，本插件把会话原本的 `cwd` 交给 **DSH 的 `subprocess` 服务**，由该服务选择执行机器及目录。远程工作区实现必须接管这个服务；仅修改文件浏览或项目名称的实现不能用于此模式。插件不会自动给缺少远程路由的工作区补建 SSH 映射。
+
+“目标”指设置中已保存的 SSH 主机。插件在工作区执行环境获取主机名、用户名和真实目录，并通过 OpenSSH 独立核对已配置目标的主机名与用户名，再在工作区环境验证 Claude。工作区环境与 DSH 本机主机名及用户名相同则不展示模型，包括同用户 SSH 回环的情况；无法证明符合条件也不展示。主机名不是密码学机器标识，请为不同机器配置不同主机名，勿将同名机器视为可互换目标。
+
+下拉是原生 `conversation.input.model` 插槽中的会话级目录视图；其他模型及其推理等级仍通过 DSH 原生模型选择接口提交，不修改全局共享目录。每次打开下拉及选择 Claude 时重新验证，切换项目会丢弃前一项目尚未完成的验证。DSH 的全局 `/model` 命令目录不受该下拉视图过滤；即使从该入口或旧缓存选择 Claude，后端也会在实际执行前重新拒绝不匹配的环境。
+
+旧版独立 SSH 工作区和专用会话仍在设置中的“兼容：独立 SSH 工作区与历史会话”里；已有绑定、历史和恢复入口保留。
 
 插件只发送本次尚未发送的用户文本。DSH 的本机 system prompt、工具声明和本地登录状态不作为远端 Claude 的配置。远端项目 `CLAUDE.md`、Skills、Hooks、MCP 与现有登录均由目标用户的 Claude Code 读取。Hooks/MCP 的具体组合需要在自己的机器验收。
 
@@ -69,7 +79,9 @@ ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes my-dev-box 'id -un; pwd'
 
 ### 会话绑定与持久化
 
-远程工作区由插件独立保存。DSH 当前原生工作区注册器只接受本机目录，因此插件**不创建本地占位项目，不同步文件，不把远端路径伪装成本机 cwd**。
+原生工作区模式保持 DSH 的项目与会话 cwd 不变，插件仅保存 `nativeBindings`：目标主机配置、原生 cwd、实际执行主机名/用户/目录、Claude ID 与运行状态。首次调用自动绑定；工作区执行身份变化时拒绝续接。
+
+以下为兼容模式：远程工作区由插件独立保存。DSH 当前原生工作区注册器只接受本机目录，因此插件**不创建本地占位项目，不同步文件，不把远端路径伪装成本机 cwd**。
 
 DSH 0.2.1-rc.2 的原生历史与冷恢复接口要求 Session header 存在 cwd。插件使用 `/__dsh_claude_ssh_remote__/<主机标识>/<工作区ID>` 作为**仅用于路由的元数据地址**，不会在本机创建它；如这个地址在本机已经存在则拒绝创建会话。远程会话通过公开 waterfall 跳过本地指令/目录/工具准备，并使用独立 composer。真正的远端路径始终来自工作区绑定，绝不取该路由地址。原生文件面板无法访问此地址，不能用来浏览远端文件；原生终端的目录检查也会失败。
 
@@ -89,7 +101,7 @@ DSH 0.2.1-rc.2 的原生历史与冷恢复接口要求 Session header 存在 cwd
 
 ## 中断与恢复
 
-取消会经 stdio 发送 `interrupt`，随后关闭 SSH，必要时终止本地 SSH 子进程。断线时无法保证远端 Claude 或其子命令已经停止；首版没有后台 keeper。DSH 重启会将遗留 running 状态标为中断。
+取消会经 stdio 发送 `interrupt`；原生模式由 DSH 进程服务负责终止其管理的进程范围。兼容模式随后关闭 SSH，必要时终止本地 SSH 子进程。断线时无法保证远端 Claude 或其子命令已经停止；首版没有后台 keeper。DSH 重启会将遗留 running 状态标为中断。
 
 插件不自动重连、不自动重试、不重发已发送的消息。先在远端检查任务与文件状态，再点击输入框上方“已检查远端，允许继续会话”。之后输入一个**新指令**，例如“先核对当前状态，不重复执行上次修改”。CLI 使用原 Claude session ID 的 `--resume`。若远端会话记录不存在或启动前已中断到无法续接，请从工作区新建会话；不会悄悄重建并重跑旧任务。
 

@@ -18,7 +18,7 @@ cd dsh-plugins
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-claude-ssh check
 corepack pnpm --filter dsh-claude-ssh pack:plugin
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.7.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.0.tgz"
 ```
 
 For **DSH Desktop**, open the application once to initialize its profile, fully quit it, then use `--profile desktop` instead of `--profile web` in the installation command. Reopen the desktop application after installation.
@@ -36,10 +36,19 @@ Fully quit DSH Desktop before installing a new package into `--profile desktop`,
 1. Open DSH Settings → **Claude SSH**.
 2. Select a connection under **从本机 SSH 配置选择** (Choose from local SSH config), or manually enter an SSH alias / `user@host`. Selecting an alias fills the target and supplies an ID/name for a new blank host. Save the host; optionally specify a port and an absolute Claude executable path.
 3. Select **测试连接与 Claude** (Test connection and Claude). This checks the target user, executable, version, authentication, and required CLI options through a real noninteractive SSH connection. It does **not** call a model.
-4. Select the saved host, browse or enter an absolute remote directory, and save the remote workspace. Empty directories are allowed. The directory must exist, be readable, and allow entry; `~` is not expanded.
-5. Choose `sonnet`, `opus`, or `haiku` for that workspace and create a remote session. These are CLI aliases resolved by the remote Claude installation.
-6. Send text in the DSH conversation. The composer continuously shows **host (SSH target) / remote user / actual remote directory**, along with the Claude session ID and state.
-7. Answer permission requests and AskUserQuestion prompts in DSH's native dialogs. Permissions are single-use decisions; unavailable, dismissed, or canceled prompts are denied. Claude also applies the target user's existing permission rules.
+4. Select an existing remote project in DSH's sidebar and open or create an ordinary conversation.
+5. Open the composer model dropdown. **Claude Sonnet / Opus / Haiku** appear only after the current execution environment matches a configured SSH host and its Claude installation passes authentication/protocol checks. Local, unrelated, unverified, and unavailable environments hide these models.
+6. Choose Claude and use the normal composer, stop button, approvals, and questions. The first turn records the execution identity automatically; later turns resume the same Claude session. No duplicate workspace registration or dedicated session creation is required.
+
+### Native workspace requirements
+
+Like oh-my-claude's `spawn: dsh`, this path passes the session's original cwd to DSH's public `subprocess` service. The remote workspace integration must route that service to its execution machine. File-panel-only integrations are insufficient; this plugin does not invent a remote mapping for them.
+
+Targets are the SSH hosts saved in settings. Eligibility compares the runtime's machine name and user with an independent OpenSSH check of those targets, checks the real directory, and probes Claude in the runtime. The DSH host's own machine/user pair is rejected, including same-user loopback SSH. Different machines must have distinct hostnames: hostnames are not cryptographic machine identities.
+
+The native model slot uses a session-scoped view of DSH's shared catalog and submits selections through DSH's own model directory. Other models and reasoning choices remain available. Opening the dropdown and selecting Claude both revalidate eligibility; obsolete checks cannot reveal models after switching projects. DSH's global `/model` command catalog is not filtered by this dropdown view; backend validation still rejects an ineligible execution selected through that command or stale state.
+
+Legacy standalone SSH workspaces and sessions remain under the compatibility disclosure in settings.
 
 The plugin sends only previously unsent user text. Local DSH system prompts, tool declarations, and local Claude authentication do not configure remote Claude. The target user's Claude Code reads the project's `CLAUDE.md`, Skills, Hooks, MCP configuration, and existing login. Validate your own Hooks/MCP setup before relying on it. The plugin UI is currently Chinese; this documentation is bilingual.
 
@@ -66,6 +75,8 @@ An interactive terminal finding `claude` does not guarantee that noninteractive 
 The executable's directory is added to PATH only for the launched process, helping installations with a sibling nvm node or Homebrew executable. Remote shell configuration is never modified. If node lives elsewhere, configure the noninteractive environment yourself or use a native Claude binary that works there.
 
 ### Workspace binding and persistence
+
+Native mode preserves DSH workspace membership and cwd. `nativeBindings` records the configured target, original cwd, observed machine/user/real directory, Claude session ID and execution state. A changed execution identity rejects continuation. The following paragraphs describe legacy standalone SSH mode.
 
 Each workspace binds a stable host ID, host configuration revision, remote user, and canonical absolute remote path. Unbound/local sessions and cross-host model selections are blocked in both the UI and backend. The directory is revalidated before each turn; a failed directory check or `cd` stops execution. There is no fallback to the remote HOME directory or local execution.
 

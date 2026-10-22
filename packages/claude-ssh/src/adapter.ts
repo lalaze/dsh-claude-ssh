@@ -31,7 +31,7 @@ export function promptOf(options: GenerateOptions, sentIds?: readonly string[]):
 }
 export class ClaudeSshAdapter extends LlmAdapter {
   readonly active = new Map<string, AbortController>();
-  constructor(private ctx: Context, readonly store: Store, readonly ssh: Ssh) { super(); }
+  constructor(protected ctx: Context, readonly store: Store, readonly ssh: Ssh) { super(); }
   override providerInfo(provider: string) {
     const host = this.store.snapshot().hosts.find(h => providerFor(h.id) === provider);
     return { id: provider, name: `Claude SSH / ${host?.name ?? '已删除主机'} / ${host?.destination ?? ''}` };

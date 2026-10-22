@@ -10,16 +10,20 @@ import type { Ssh } from './ssh.js';
 import { MODELS, type ClaudeSshAdapter } from './adapter.js';
 
 export class Manager {
-  constructor(readonly ctx: Context, readonly store: Store, readonly ssh: Ssh, readonly adapter: ClaudeSshAdapter, readonly refresh: () => void) {}
+  constructor(readonly ctx: Context, readonly store: Store, readonly ssh: Ssh, readonly adapter: ClaudeSshAdapter, readonly refresh: () => void, readonly nativeActive: (id: string) => boolean = () => false) {}
+  private hostBusy(id: string): boolean {
+    const state = this.store.snapshot();
+    return [...Object.values(state.bindings), ...Object.values(state.nativeBindings)].some(b => b.hostId === id && (this.adapter.active.has(b.sessionId) || this.nativeActive(b.sessionId)));
+  }
   host(id: string): Host { const h = this.store.snapshot().hosts.find(h => h.id === id); if (!h) throw new SshClaudeError('HOST_NOT_FOUND', '主机已删除。'); return h; }
   async saveHost(input: Host): Promise<Host> {
     const host = validateHost(input);
-    if (Object.values(this.store.snapshot().bindings).some(b => b.hostId === host.id && this.adapter.active.has(b.sessionId))) throw new SshClaudeError('HOST_BUSY', '此主机有活动会话，暂不能编辑。');
+    if (this.hostBusy(host.id)) throw new SshClaudeError('HOST_BUSY', '此主机有活动会话，暂不能编辑。');
     await this.store.update(s => { const at = s.hosts.findIndex(h => h.id === host.id); if (at === -1) s.hosts.push(host); else s.hosts[at] = host; });
     this.refresh(); return host;
   }
   async deleteHost(id: string): Promise<void> {
-    if (Object.values(this.store.snapshot().bindings).some(b => b.hostId === id && this.adapter.active.has(b.sessionId))) throw new SshClaudeError('HOST_BUSY', '请先停止此主机上的活动会话。');
+    if (this.hostBusy(id)) throw new SshClaudeError('HOST_BUSY', '请先停止此主机上的活动会话。');
     await this.store.update(s => { s.hosts = s.hosts.filter(h => h.id !== id); s.workspaces = s.workspaces.filter(w => w.hostId !== id); });
     this.refresh();
   }

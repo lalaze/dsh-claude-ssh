@@ -12,9 +12,10 @@ export class Store {
     try {
       const data = JSON.parse(await readFile(this.file, 'utf8'));
       if (data.version !== 1 || !Array.isArray(data.hosts) || !Array.isArray(data.workspaces) || !data.bindings || typeof data.bindings !== 'object') throw new Error('存储格式无效');
-      this.value = data;
+      if (data.nativeBindings !== undefined && (!data.nativeBindings || typeof data.nativeBindings !== 'object' || Array.isArray(data.nativeBindings))) throw new Error('原生会话存储格式无效');
+      this.value = { ...data, nativeBindings: data.nativeBindings ?? {} };
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
-    await this.update(s => { for (const b of Object.values(s.bindings)) if (b.state === 'running') { b.state = 'interrupted'; b.lastError = 'DSH 已重启；远端任务结果未知。请先检查远端，再明确恢复。'; } });
+    await this.update(s => { for (const b of [...Object.values(s.bindings), ...Object.values(s.nativeBindings)]) if (b.state === 'running') { b.state = 'interrupted'; b.lastError = 'DSH 已重启；远端任务结果未知。请先检查远端，再明确恢复。'; } });
   }
   snapshot(): State { return structuredClone(this.value); }
   async update<T>(change: (state: State) => T): Promise<T> {

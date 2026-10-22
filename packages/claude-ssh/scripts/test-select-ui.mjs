@@ -125,6 +125,27 @@ try {
       if (document.querySelector('.dsh-ssh-select-panel')) throw new Error('Escape did not close the Codex popup');`);
     console.log('PASS: installed Codex UI settings component mouse open/select, search, Enter, Escape, focus containment and no label reactivation');
   }
+  click('#native-models [aria-label="模型"]');
+  browser('wait', '--fn', 'Array.from(document.querySelectorAll("#native-models [role=option]")).filter(e=>e.textContent.includes("Claude")).length===3');
+  evaluate(`if (document.querySelector('#native-models [role=listbox]').textContent.includes('Legacy Claude')) throw new Error('Cross-host legacy model leaked');`);
+  browser('fill', '#native-models [role=searchbox]', 'opus'); browser('press', 'Enter');
+  browser('wait', '--fn', 'document.getElementById("native-selection").textContent.includes("opus")');
+  click('#local-project');
+  click('#native-models [aria-label="模型"]');
+  evaluate(`if (document.querySelector('#native-models [role=listbox]').textContent.includes('Claude')) throw new Error('Claude leaked into local project');`);
+  click('#native-models [role=option]');
+  click('#native-models [aria-label="推理等级"]');
+  click('#native-models [role=option]:nth-child(2)');
+  evaluate(`if (!document.getElementById('native-selection').textContent.includes('high')) throw new Error('Other provider reasoning selection broke');`);
+  // A remote probe is deliberately slower than the local one: its late result must not
+  // make the shared model catalog visible in the next project's menu.
+  evaluate('window.nativeDelay = 1500');
+  click('#remote-project'); click('#native-models [aria-label="模型"]'); browser('press', 'Escape'); click('#local-project');
+  click('#native-models [aria-label="模型"]');
+  evaluate('new Promise(resolve => setTimeout(resolve, 1600))');
+  evaluate(`if (document.querySelector('#native-models [role=listbox]').textContent.includes('Claude')) throw new Error('Stale remote eligibility leaked across sessions');`);
+  browser('press', 'Escape');
+  console.log('PASS: target-only Claude models, native selection, other-provider reasoning, no cross-host models or stale eligibility after project switch');
   console.log('PASS: same-document, separate-document and modal mouse open/select, viewport placement, focus, search, Enter, Escape, outside click');
 } catch (error) {
   try { console.error('Browser errors:', JSON.stringify(browser('errors'))); } catch {}

@@ -6,14 +6,14 @@ import { type Binding, type Host, SshClaudeError } from './domain.js';
 import { controlReply, deny, line, Translator, type Frame } from './protocol.js';
 
 export interface RunOptions {
-  host: Host; binding: Binding; binary: string; model: string; prompt: string; signal: AbortSignal;
+  host: Host; binding: Binding & { machine?: string }; binary: string; model: string; prompt: string; signal: AbortSignal;
   decide: (request: Frame, signal: AbortSignal) => Promise<unknown>;
   initialized: () => Promise<void>;
 }
 export function launchScript(o: Pick<RunOptions, 'binding' | 'binary' | 'model'>): string {
   const b = o.binding;
   const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', 'default', '--permission-prompt-tool', 'stdio', '--tools', 'default', '--model', o.model, b.initialized ? '--resume' : '--session-id', b.claudeSessionId];
-  return `${enter(b.path)} test "$(id -un)" = ${quote(b.user)} || exit 75; test -x ${quote(o.binary)} || exit 72; PATH=${quote(o.binary.slice(0, o.binary.lastIndexOf('/')))}:"$PATH"; export PATH; exec ${[o.binary, ...args].map(quote).join(' ')}`;
+  return `${enter(b.path)} ${b.machine ? `test "$(uname -n)" = ${quote(b.machine)} || exit 75; ` : ''}test "$(id -un)" = ${quote(b.user)} || exit 75; test -x ${quote(o.binary)} || exit 72; PATH=${quote(o.binary.slice(0, o.binary.lastIndexOf('/')))}:"$PATH"; export PATH; exec ${[o.binary, ...args].map(quote).join(' ')}`;
 }
 /** One SSH process per foreground turn; no detached keeper, reconnect or replay. */
 export async function* runTurn(ssh: Ssh, o: RunOptions): AsyncGenerator<StreamChunk> {

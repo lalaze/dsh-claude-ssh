@@ -65,6 +65,13 @@ test('公开 waterfall 仅接管已绑定会话；普通本地会话完全委托
     assert.equal(state.bindings[f.binding.sessionId].path, f.path);
     assert.equal(state.plugin.version, PLUGIN_VERSION);
     assert.ok(state.plugin.capabilities.includes('sshAliases'));
+    assert.ok(state.plugin.capabilities.includes('nativeWorkspaceModels'));
+    const nativeAgent = { session: { id: 'native-session', header: { cwd: '/native-project' }, snapshotEvents: () => [{ type: 'model/selection', data: { provider: 'claude-workspace', model: 'opus' } }] } };
+    assert.deepEqual(await handlers.get('agent/pre-step')!({ agent: nativeAgent, messages: ['native message'] }, next), { kind: 'enter', messages: ['native message'] });
+    assert.deepEqual(await handlers.get('agent/request')!({ agent: nativeAgent }, async () => request), { provider: 'claude-workspace', model: 'opus', reasoningEffort: undefined });
+    nativeAgent.session.snapshotEvents = () => [{ type: 'model/selection', data: { provider: 'ordinary-local', model: 'local' } }];
+    assert.deepEqual(await handlers.get('agent/pre-step')!({ agent: nativeAgent, messages: [] }, next), { local: true });
+    assert.deepEqual(await handlers.get('agent/request')!({ agent: nativeAgent }, async () => request), request);
     const result = await route.fetch(new Request('http://example.test/api/claude-ssh', { method: 'POST', body: JSON.stringify({ action: 'sshAliases' }) }));
     assert.equal(result.status, 200);
     const aliases = await result.json();

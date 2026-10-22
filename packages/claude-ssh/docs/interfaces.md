@@ -1,5 +1,18 @@
 # 实际接口调查
 
+## 0.2.0 原生工作区与模型菜单
+
+本次继续按已安装的 DSH 0.2.1-rc.2 接口实现，并在独立临时 Web profile 中加载安装包验收。
+
+- `ctx.subprocess.spawn`：沿用 oh-my-claude 的 `spawn: dsh` 设计，传入会话原始 `cwd`，由挂载的运行时负责远程映射。插件不重建项目或替换 cwd。服务必须在插件 `inject` 中声明；直接读返回 Agent 的 `ctx.subprocess` 会触发 Cordis 注入限制。
+- `SubprocessHandle` 的 pipe streams / `done` / `terminate`：适配现有 stream-json runner，取消由 DSH 提供者管理进程范围。
+- `ctx.modelDirectories.directoryFor(sessionId)`：共享 DSH 的原生目录加载和 `selectModel` 提交。客户端需要同时注入 `sessions`、`modelDirectories`、`remote`、`remote.session`；缺少后两者会在真实 Cordis 环境中报 `cannot get property remote.session without inject`。
+- `conversation.input.model`：按会话过滤目录后显示模型，其他 provider 和 reasoning metadata 保留。DSH 当前 catalog 是 Host 全局接口，无 session 参数，故不能通过全局注册/注销 adapter 实现项目级可见性。`/model` 全局命令目录仍保持 DSH 行为；执行校验覆盖该入口。
+- 原生会话的 `model/selection` / request header：恢复会话时读取其明确选择，跳过本地 Claude 无需的 DSH 指令/工具准备；切回其他 provider 后完整委托原服务。
+- 目标识别是执行环境验证：在原始 cwd 通过 subprocess 查询主机名、用户、实际目录，与已保存 SSH 目标独立核对；本机环境、未知主机、Claude 不可用和待验证状态不展示 Claude。没有远程 subprocess 路由的工作区不推测为远端。
+
+以下记录保留 0.1.x 独立 SSH 兼容模式的接口设计。
+
 检查日期：2026-10-21。主机实际 `dsh --version` 为 **0.2.1-rc.2**，不是按记忆推断。
 
 已检查仓库至文件系统根路径沿途的 AGENTS.md；没有额外项目文件。执行用户提供的全局指令。开始时仓库只有初始化提交。

@@ -1,7 +1,14 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import type { Readable, Writable } from 'node:stream';
 import { absolutePath, validateHost, SshClaudeError, type Host } from './domain.js';
 
+export interface PipeProcess {
+  stdin: Writable; stdout: Readable; stderr: Readable;
+  once(event: 'error', listener: (error: Error) => void): unknown;
+  once(event: 'close', listener: (code: number | null) => void): unknown;
+  kill(signal?: NodeJS.Signals): boolean;
+}
 export type Spawn = (file: string, args: string[]) => ChildProcessWithoutNullStreams;
 export function sshEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...source, LC_ALL: 'C' };
@@ -34,7 +41,7 @@ export function findClaude(host: Host): string {
 }
 export class Ssh {
   constructor(readonly spawn: Spawn = spawnSsh) {}
-  start(host: Host, script: string): ChildProcessWithoutNullStreams { return this.spawn('ssh', sshArgs(host, script)); }
+  start(host: Host, script: string): PipeProcess { return this.spawn('ssh', sshArgs(host, script)); }
   async run(host: Host, script: string, signal?: AbortSignal): Promise<string> {
     signal?.throwIfAborted();
     const mark = `DSH_SSH_${randomUUID()}`;

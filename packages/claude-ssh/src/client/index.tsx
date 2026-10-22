@@ -5,12 +5,17 @@ import { hostFromAlias } from './host-draft.js';
 import { loadSshAliases, aliasPlaceholder } from './ssh-aliases.js';
 import { Select } from './select.js';
 import { PLUGIN_VERSION } from '../version.js';
+import { ModelPicker, type Directory } from './model-picker.js';
+import { NATIVE_PROVIDER } from './model-filter.js';
+import type { Eligibility } from '../native.js';
 
 // Narrow views of public 0.2.1-rc.2 client faces; source locations are documented in docs/interfaces.md.
 type Props = { sessionId?: string; matched?: { sessionId: string }; close?: () => void; useProjection?: (key: string, select: (v: any) => any) => any; useSession?: (select: (v: any) => any) => any };
 interface Client {
   slots: { inject(name: string, factory: () => unknown): unknown; register(spec: Record<string, unknown>, component: React.FC<Props>): unknown };
   uiWorkspace: { openSession(id: string): void };
+  modelDirectories: { directoryFor(id: string): Directory };
+  sessions: { subagentAddress(id: string): unknown };
   conversation: { blocks: { set(id: string, block: { reason: string } | undefined): void; storeFor(id: string): { getSnapshot(): { reason: string } | undefined } } };
   effect(effect: () => (() => void) | void): void;
 }
@@ -42,7 +47,13 @@ const button: React.CSSProperties = { ...field, cursor: 'pointer' };
 const identity = (h: Host | undefined, w: { user: string; path: string }) => `${h?.name ?? '主机已删除'} (${h?.destination ?? '不可用'}) / ${w.user} / ${w.path}`;
 const stateName = { ready: '就绪', running: '运行中', completed: '已完成', cancelled: '已取消，需检查后恢复', interrupted: '已中断，远端结果未知' };
 export const name = 'dsh-claude-ssh-client';
-export const inject = ['slots', 'conversation', 'uiWorkspace'];
+export const inject = ['slots', 'conversation', 'uiWorkspace', 'modelDirectories', 'sessions', 'remote', 'remote.session'];
+async function checkWorkspace(sessionId: string, signal: AbortSignal): Promise<Eligibility> {
+  const r = await fetch(URL_PATH, { method: 'POST', credentials: 'same-origin', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'workspaceEligibility', sessionId }) });
+  const data = await r.json();
+  if (!r.ok || !data.ok) throw new Error(data.error?.message ?? '工作区验证失败');
+  return data.value;
+}
 export async function apply(ctx: Client): Promise<void> {
   try { await api<StateView>(); } catch { /* Settings still renders a reconnect error. */ }
   const Settings: React.FC<Props> = ({ close }) => {
@@ -65,7 +76,7 @@ export async function apply(ctx: Client): Promise<void> {
     const open = (sessionId: string) => { ctx.uiWorkspace.openSession(sessionId); close?.(); };
     return <section style={style} aria-label="Claude SSH">
       <h2 style={{ margin: 0 }}>Claude SSH</h2>
-      <p>Claude Code 在远端运行。本机仅转发文本、展示事件与权限确认。请先选择远程工作区，再创建会话。</p>
+      <p>在左侧选择远程项目，再从对话的模型菜单选择 Claude Sonnet、Opus 或 Haiku。仅当工作区确实运行在下方已配置的 SSH 主机上，且 Claude 已登录可用时，菜单才显示 Claude；本机和其他项目不显示。无需另存工作区或另建专用会话。</p>
       {(error || message) && <div role="status" style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-primary, inherit)' }}>{message || error}</div>}
       <fieldset disabled={busy} style={card}><legend>SSH 主机</legend>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{data?.hosts.map(h => <button key={h.id} style={button} onClick={() => { setSelected(h.id); setHost(h); setListing(undefined); setMessage(''); }}>{h.name} / {h.destination}</button>)}</div>
@@ -86,6 +97,7 @@ export async function apply(ctx: Client): Promise<void> {
           <button style={button} disabled={!selected} onClick={() => act(async () => { const p = await api<{ user: string; path: string; version: string }>({ action: 'probe', hostId: selected }); setMessage(`SSH 连接成功 / 用户 ${p.user}\n${p.path}\n${p.version}\n远端登录状态：已登录（未调用模型）`); })}>测试连接与 Claude</button>{' '}
           <button style={button} disabled={!selected} onClick={() => { if (window.confirm('删除主机及其工作区？历史会话将停止可用，不删除远端数据。')) void act(async () => { await api({ action: 'deleteHost', hostId: selected }); setSelected(''); setHost({ id: '', name: '', destination: '' }); }); }}>删除主机</button></div>
       </fieldset>
+      <details><summary>兼容：独立 SSH 工作区与历史会话</summary>
       <fieldset disabled={busy || !selected} style={card}><legend>远程工作区 · {data?.hosts.find(h => h.id === selected)?.destination ?? '先选择主机'}</legend>
         <label>远端绝对目录<input style={{ ...field, width: '100%' }} value={path} onChange={e => { setPath(e.target.value); setListing(undefined); }} /></label>
         <div><button style={button} onClick={() => browse(path)}>浏览 / 验证目录</button>{' '}<button style={button} onClick={() => act(async () => { const w = await api<Workspace>({ action: 'createWorkspace', hostId: selected, path }); setMessage(`工作区已验证：${w.user} / ${w.path}`); })}>保存远程工作区</button></div>
@@ -96,6 +108,7 @@ export async function apply(ctx: Client): Promise<void> {
       </div>
       <div style={card}><strong>远程会话</strong>{data && Object.values(data.bindings).map(b => <div key={b.sessionId}><div style={{ overflowWrap: 'anywhere' }}>{identity(data.hosts.find(h => h.id === b.hostId), b)}</div><small>{stateName[b.state]} · Claude {b.claudeSessionId}</small><div><button style={button} onClick={() => open(b.sessionId)}>打开会话</button></div></div>)}</div>
       <p>文件面板与终端限制：DSH 内置面板面向本机，不提供此工作区的远端浏览和终端。插件不映射本地项目；远端文件请由 Claude 工具处理。不要把其他已打开的本地文件页当作远端结果。</p>
+      </details>
     </section>;
   };
   const Dock: React.FC<Props> = props => {
@@ -159,7 +172,31 @@ export async function apply(ctx: Client): Promise<void> {
       </div>{message && <div role="alert">{message}</div>}
     </div>;
   };
+  const NativeDock: React.FC<Props> = props => {
+    const { data } = useStateData();
+    const selection = props.useProjection?.('modelSelection', v => v?.next ?? v?.lastUsed);
+    const b = props.sessionId ? data?.nativeBindings?.[props.sessionId] : undefined;
+    const [error, setError] = useState('');
+    if (selection?.provider !== NATIVE_PROVIDER || !b) return null;
+    return <aside style={{ ...card, padding: 8 }}><small>Claude · {identity(data?.hosts.find(h => h.id === b.hostId), b)} · {stateName[b.state]}</small>
+      {b.lastError && <small role="alert">{b.lastError}</small>}
+      {['interrupted', 'cancelled'].includes(b.state) && <button style={button} onClick={async () => {
+        if (!window.confirm('确认已检查远端任务，继续同一 Claude 会话？不会重发上次消息。')) return;
+        try { await api({ action: 'recoverNative', sessionId: b.sessionId, confirm: true }); setError(''); } catch (e) { setError(String(e)); }
+      }}>已检查远端，继续会话</button>}
+      {error && <small role="alert">{error}</small>}
+    </aside>;
+  };
+  const NativeModelPicker: React.FC<Props> = props => {
+    const { data } = useStateData();
+    if (!props.sessionId) return null;
+    const binding = data?.bindings[props.sessionId];
+    return <ModelPicker key={props.sessionId} sessionId={props.sessionId} directory={ctx.modelDirectories.directoryFor(props.sessionId)}
+      available={ctx.sessions.subagentAddress(props.sessionId) === undefined} legacyHostId={data?.routeErrors?.[props.sessionId] ? undefined : binding?.hostId} targetsKey={JSON.stringify(data?.hosts ?? [])} check={checkWorkspace} />;
+  };
   ctx.slots.inject('settings.section', () => ctx.slots.register({ name: 'settings.section', id: 'claude-ssh', order: 65, label: () => 'Claude SSH' }, Settings));
+  ctx.slots.inject('conversation.input.model', () => ctx.slots.register({ name: 'conversation.input.model', id: 'claude-workspace-models', priority: -1 }, NativeModelPicker));
+  ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({ name: 'conversation.input.dock', id: 'claude-workspace-binding', order: -101 }, NativeDock));
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({ name: 'conversation.input.dock', id: 'claude-ssh-binding', order: -100 }, Dock));
   ctx.slots.inject('conversation.composer', () => ctx.slots.register({ name: 'conversation.composer', id: 'claude-ssh-composer', priority: 100,
     select: ({ sessionId, pendingInteraction }: { sessionId?: string; pendingInteraction?: unknown }) => sessionId && cached?.bindings[sessionId] && !pendingInteraction ? { sessionId } : null
