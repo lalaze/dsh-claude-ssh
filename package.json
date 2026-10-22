@@ -1,6 +1,6 @@
 {
   "name": "dsh-claude-ssh",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Claude SSH — 在 DeepSeek Harness 中使用远端 Claude Code",
   "type": "module",
   "main": "lib/server/index.js",

@@ -18,17 +18,19 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.0.tgz
+dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.1.tgz
 ```
 
-重启该 DSH profile，然后刷新浏览器。设置菜单中应出现 **Claude SSH**。插件未发布至 npm；不要使用 `dsh plugin add dsh-claude-ssh` 假定已有公开包。包内含编译产物、客户端模块与 `cordis.patch.yml`，安装无需远端构建。
+安装到 **DSH 桌面端**：先打开应用一次以初始化 profile，完全退出后，将上述命令的 `--profile web` 改为 `--profile desktop` 执行，再重新打开桌面应用。
+
+Web 端请重启对应 DSH profile，然后刷新浏览器。设置菜单中应出现 **Claude SSH**。插件未发布至 npm；不要使用 `dsh plugin add dsh-claude-ssh` 假定已有公开包。包内含编译产物、客户端模块与 `cordis.patch.yml`，安装无需远端构建。
 
 也可把打包文件传到目标 DSH 主机再执行安装命令。GitHub 安装需仓库包含预编译 `lib`，因此首版推荐 `.tgz`。
 
 ## 配置与使用
 
 1. 打开 DSH 设置 → **Claude SSH**。
-2. 添加主机：填写稳定标识（如 `dev-mac`）、名称、SSH config 别名或 `user@host`；可指定端口、Claude 的绝对路径。
+2. 在“从本机 SSH 配置选择”中选择已有连接，也可手动填写 SSH 别名或 `user@host`。选择别名会填入 SSH 目标，并为空白新主机补上标识和名称；仍需点击保存。可选填端口和 Claude 绝对路径。
 3. 点击“测试连接与 Claude”。这会在真实非交互 SSH 环境检测目标用户、二进制、版本、登录状态和必要 CLI 参数，**不调用模型**。
 4. 选择已保存主机，浏览或输入远端绝对路径，点击“保存远程工作区”。空目录也可以使用。路径必须实际存在、可读且可进入；`~` 不会自动展开。
 5. 在已保存工作区中选择 `sonnet`、`opus` 或 `haiku`（Claude CLI 模型别名，实际模型由远端解析），点击“创建远程会话”。
@@ -52,6 +54,8 @@ ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes my-dev-box 'id -un; pwd'
 连接目标若填写 config 别名，端口留空才沿用 config 的 Port；直接 IPv6 地址请写 `[::1]` 或 `user@[::1]`。
 
 本机也可以作为 SSH 目标，但需要先开启 SSH 服务并配置密钥认证。安装插件不会自动开启服务或更改 SSH 配置。本次开发环境的回环验收配置及卸载方法见[验证记录](docs/validation.md#本机-ssh-验收配置)。
+
+别名列表读取运行 DSH 用户的 `~/.ssh/config`、递归 Include 文件和 `/etc/ssh/ssh_config`；支持常见 Include 通配、双引号路径、`~`、`%d`、`%%` 和 `${变量}`。配置修改后点击“刷新 SSH 列表”。仅列出明确的 Host 别名，不将通配/否定规则或 known_hosts 记录当作连接；不读取私钥，也不在列表阶段执行 Match/ProxyCommand。条件 Include 中的条目会作为候选列出，最终条件由连接时的 OpenSSH 解析。依赖目标主机的动态 Include 令牌及其他用户的 `~user` 路径会提示跳过，仍可手动填写别名。若 DSH 运行在服务器上，读取的是该服务器用户的配置，不是浏览器所在电脑的配置。
 
 ### Claude 的非交互环境
 
@@ -124,7 +128,7 @@ npm pack
 
 测试采用 Node test runner。核心协议夹具代替 Claude、不消耗额度；目录测试通过真实 zsh → POSIX sh 执行，但不能把这些夹具测试称为真实 SSH / Claude 推理测试。
 
-当前验证结果：类型检查、20 项自动测试和构建通过；macOS 本机经真实 SSH 完成安装、Claude 检测、文件写入权限确认、用户问题与重启后续接。Linux、第二台物理主机以及真实长任务断线/取消尚未实测。
+当前验证结果：类型检查、25 项自动测试和构建通过；macOS 本机经真实 SSH 完成安装、Claude 检测、文件写入权限确认、用户问题与重启后续接。Linux、第二台物理主机以及真实长任务断线/取消尚未实测。
 
 真实 SSH 验收步骤见 [docs/acceptance.md](docs/acceptance.md)，实际接口调查见 [docs/interfaces.md](docs/interfaces.md)，本次验证记录见 [docs/validation.md](docs/validation.md)。
 

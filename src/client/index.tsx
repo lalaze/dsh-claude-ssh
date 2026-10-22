@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { Host, StateView, Workspace } from '../domain.js';
+import type { SshAliases } from '../ssh-config.js';
+import { hostFromAlias } from './host-draft.js';
 
 // Narrow views of public 0.2.1-rc.2 client faces; source locations are documented in docs/interfaces.md.
 type Props = { sessionId?: string; matched?: { sessionId: string }; close?: () => void; useProjection?: (key: string, select: (v: any) => any) => any; useSession?: (select: (v: any) => any) => any };
@@ -43,9 +45,18 @@ export async function apply(ctx: Client): Promise<void> {
   const Settings: React.FC<Props> = ({ close }) => {
     const { data, error } = useStateData();
     const [host, setHost] = useState<Host>({ id: '', name: '', destination: '' });
+    const [aliases, setAliases] = useState<SshAliases>(); const [aliasError, setAliasError] = useState(''); const [loadingAliases, setLoadingAliases] = useState(false);
+    const loadAliases = async () => {
+      setLoadingAliases(true); setAliasError('');
+      try { setAliases(await api<SshAliases>({ action: 'sshAliases' })); }
+      catch (e) { setAliasError(e instanceof Error ? e.message : String(e)); }
+      finally { setLoadingAliases(false); }
+    };
+    useEffect(() => { void loadAliases(); }, []);
     const [selected, setSelected] = useState(''); const [path, setPath] = useState('/');
     const [listing, setListing] = useState<{ path: string; user: string; names: string[] }>();
     const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false); const [model, setModel] = useState('sonnet');
+    const editHost = (draft: Host) => { setHost(draft); setSelected(''); setListing(undefined); setMessage(''); };
     const act = async (operation: () => Promise<unknown>) => { setBusy(true); setMessage(''); try { await operation(); } catch (e) { setMessage(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); } };
     const browse = (p: string) => act(async () => { const d = await api<{ path: string; user: string; names: string[] }>({ action: 'browse', hostId: selected, path: p }); setListing(d); setPath(d.path); });
     const open = (sessionId: string) => { ctx.uiWorkspace.openSession(sessionId); close?.(); };
@@ -54,15 +65,23 @@ export async function apply(ctx: Client): Promise<void> {
       <p>Claude Code 在远端运行。本机仅转发文本、展示事件与权限确认。请先选择远程工作区，再创建会话。</p>
       {(error || message) && <div role="status" style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-primary, inherit)' }}>{message || error}</div>}
       <fieldset disabled={busy} style={card}><legend>SSH 主机</legend>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{data?.hosts.map(h => <button key={h.id} style={button} onClick={() => { setSelected(h.id); setHost(h); setListing(undefined); }}>{h.name} / {h.destination}</button>)}</div>
-        <label>稳定标识（编辑时保持不变）<input style={{ ...field, width: '100%' }} value={host.id} onChange={e => setHost({ ...host, id: e.target.value })} placeholder="dev-mac" /></label>
-        <label>显示名称<input style={{ ...field, width: '100%' }} value={host.name} onChange={e => setHost({ ...host, name: e.target.value })} /></label>
-        <label>SSH 目标<input style={{ ...field, width: '100%' }} value={host.destination} onChange={e => setHost({ ...host, destination: e.target.value })} placeholder="user@host 或 ~/.ssh/config 别名" /></label>
-        <label>端口（留空沿用 SSH config）<input style={field} type="number" value={host.port ?? ''} onChange={e => setHost({ ...host, port: e.target.value ? Number(e.target.value) : undefined })} /></label>
-        <label>Claude 绝对路径（可选）<input style={{ ...field, width: '100%' }} value={host.claudePath ?? ''} onChange={e => setHost({ ...host, claudePath: e.target.value || undefined })} placeholder="/home/user/.local/bin/claude" /></label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{data?.hosts.map(h => <button key={h.id} style={button} onClick={() => { setSelected(h.id); setHost(h); setListing(undefined); setMessage(''); }}>{h.name} / {h.destination}</button>)}</div>
+        <label>从本机 SSH 配置选择<select style={{ ...field, width: '100%' }} disabled={loadingAliases || !aliases?.aliases.length} value={aliases?.aliases.includes(host.destination) ? host.destination : ''} onChange={e => {
+          if (!e.target.value) return;
+          editHost(hostFromAlias(host, e.target.value));
+        }}><option value="">{loadingAliases ? '正在读取 SSH 配置…' : aliases?.aliases.length ? '请选择 SSH 别名（也可在下方手动填写）' : '未发现 SSH 别名，可在下方手动填写'}</option>{aliases?.aliases.map(alias => <option key={alias} value={alias}>{alias}</option>)}</select></label>
+        <div><button style={button} disabled={loadingAliases} onClick={() => void loadAliases()}>刷新 SSH 列表</button></div>
+        <small>读取运行 DSH 的本机用户 ~/.ssh/config、Include 和系统 SSH 配置。选择后仍需保存、测试；用户、端口、密钥与跳板机由 OpenSSH 解析。不会列出通配规则或读取私钥。条件 Include 中的条目为候选，最终由 OpenSSH 解析。</small>
+        {aliasError && <div role="alert">SSH 列表读取失败：{aliasError}；仍可手动填写。</div>}
+        {aliases?.warnings.map(w => <div role="status" key={w}>{w}</div>)}
+        <label>稳定标识（编辑时保持不变）<input style={{ ...field, width: '100%' }} value={host.id} onChange={e => editHost({ ...host, id: e.target.value })} placeholder="dev-mac" /></label>
+        <label>显示名称<input style={{ ...field, width: '100%' }} value={host.name} onChange={e => editHost({ ...host, name: e.target.value })} /></label>
+        <label>SSH 目标<input style={{ ...field, width: '100%' }} value={host.destination} onChange={e => editHost({ ...host, destination: e.target.value })} placeholder="user@host 或 ~/.ssh/config 别名" /></label>
+        <label>端口（留空沿用 SSH config）<input style={field} type="number" value={host.port ?? ''} onChange={e => editHost({ ...host, port: e.target.value ? Number(e.target.value) : undefined })} /></label>
+        <label>Claude 绝对路径（可选）<input style={{ ...field, width: '100%' }} value={host.claudePath ?? ''} onChange={e => editHost({ ...host, claudePath: e.target.value || undefined })} placeholder="/home/user/.local/bin/claude" /></label>
         <small>沿用系统密钥、Agent、known_hosts 与 ProxyJump。端点或 Claude 路径改变会使旧绑定失效，须重新验证工作区。</small>
         <div><button style={button} onClick={() => act(async () => { await api({ action: 'saveHost', host }); setSelected(host.id); setMessage('主机已保存。'); })}>保存主机</button>{' '}
-          <button style={button} onClick={() => { setHost({ id: '', name: '', destination: '' }); setSelected(''); }}>新增</button>{' '}
+          <button style={button} onClick={() => editHost({ id: '', name: '', destination: '' })}>新增</button>{' '}
           <button style={button} disabled={!selected} onClick={() => act(async () => { const p = await api<{ user: string; path: string; version: string }>({ action: 'probe', hostId: selected }); setMessage(`SSH 连接成功 / 用户 ${p.user}\n${p.path}\n${p.version}\n远端登录状态：已登录（未调用模型）`); })}>测试连接与 Claude</button>{' '}
           <button style={button} disabled={!selected} onClick={() => { if (window.confirm('删除主机及其工作区？历史会话将停止可用，不删除远端数据。')) void act(async () => { await api({ action: 'deleteHost', hostId: selected }); setSelected(''); setHost({ id: '', name: '', destination: '' }); }); }}>删除主机</button></div>
       </fieldset>

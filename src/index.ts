@@ -6,6 +6,7 @@ import { homedir } from 'node:os';
 import { SessionId } from '@deepseek-ai/dsh-session';
 import { Store } from './store.js';
 import { Ssh } from './ssh.js';
+import { discoverSshAliases } from './ssh-config.js';
 import { ClaudeSshAdapter } from './adapter.js';
 import { Manager } from './manager.js';
 import { providerFor, route, SshClaudeError } from './domain.js';
@@ -73,6 +74,7 @@ export async function apply(ctx: Context, config: { stateDir?: string } = {}): P
       const raw = await request.text(); if (Buffer.byteLength(raw) > 256 * 1024) throw new Error('请求过大');
       const b = JSON.parse(raw); let value: unknown;
       switch (b.action) {
+        case 'sshAliases': value = await discoverSshAliases(); break;
         case 'saveHost': value = await manager.saveHost(b.host); break;
         case 'deleteHost': await manager.deleteHost(text(b.hostId)); break;
         case 'probe': value = await ssh.probe(manager.host(text(b.hostId)), request.signal); break;

@@ -5,9 +5,9 @@
 ## 构建与自动测试
 
 - `npm run typecheck`：通过。
-- `npm test`：**20 项通过，0 失败，0 跳过**。
+- `npm test`：**25 项通过，0 失败，0 跳过**（含 0.1.1 新增的 5 项 SSH 配置/表单测试）。
 - `npm run build`：通过，生成服务端 JS / 声明与 DSH 客户端模块。
-- `npm pack`：生成可安装的 `dsh-claude-ssh-0.1.0.tgz`，含编译产物、清单、中英文 README、接口调查、验收步骤、许可证。
+- `npm pack`：生成可安装的 `dsh-claude-ssh-0.1.1.tgz`，含编译产物、清单、中英文 README、接口调查、验收步骤、许可证。
 
 自动测试覆盖：未绑定拒绝、错主机拒绝、配置/路径改变拒绝、无目录停止且不回退 HOME、Claude 缺失/未登录/SSH 分类错误；真实 zsh → POSIX sh 下空目录与中文/空格/引号；stream-json 流式和整帧避免重复；工具结果不产生本地可执行 tool-call；单次允许/拒绝/不可用；AskUserQuestion 协议；未知控制请求返回 error；interrupt、断线、明确恢复；同一消息不重发；多主机多会话并发隔离；原子持久化与重启状态；路由地址不创建本地目录；本地会话 waterfall 原样委托；冷恢复不会误用全局默认模型，显式跨主机选择仍拒绝；移除本机 Claude/Anthropic 凭据和配置环境、保留 SSH Agent，防止 SendEnv 意外转发。
 
@@ -46,5 +46,9 @@
 验收结束后关闭独立 DSH、清理已知临时远端目录、关闭自动化浏览器并检查临时 agent-browser 进程。为后续使用保留已授权的本机专用 SSH 配置。
 
 ## 本机 SSH 验收配置
+
+0.1.1 SSH 别名选择增量验证：真实配置只读枚举找到 5 个别名（包括 Include 中的本机别名）；隔离 Web profile 安装新包后，在真实浏览器检查下拉列表、自动填充、保存主机、手动输入及刷新保留草稿，并使用选中别名完成非交互 SSH / Claude 检测。此次没有调用模型或修改远端文件，也未修改现有 SSH 配置。桌面载体的此项增量仍未实测。
+
+新增自动测试覆盖递归/循环/符号链接 Include、相对路径基准、glob、引号、环境变量及 HOME 令牌、通配和否定规则过滤、缺失/超限/错误配置、静态扫描不执行 Match 命令且不解析 IdentityFile，以及主机 ID 保持和新别名端口继承。
 
 **本次工作环境已配置本机别名 `dsh-claude-ssh-self`**，目标 `lalaze@localhost:22`。专用密钥位于 `~/.ssh/dsh_claude_ssh_ed25519`，公钥在 authorized_keys 中限制为回环来源、禁用转发/PTY。独立配置为 `~/.ssh/dsh-claude-ssh.conf`，由现有 config 的 Include 引用；修改前已备份 config。它是当前机器的验收配置，不是安装包的一部分，其他用户应自行配置目标主机。卸载此测试配置时，删除对应 Include、独立文件、专用密钥以及 authorized_keys 中带 `dsh-claude-ssh-self` 注释的单行，保留其他内容。

@@ -18,17 +18,19 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.0.tgz
+dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.1.tgz
 ```
 
-Restart that DSH profile and refresh the browser. **Claude SSH** should appear in Settings. The package includes compiled server code, the client module, and `cordis.patch.yml`; no build is required on the SSH target.
+For **DSH Desktop**, open the application once to initialize its profile, fully quit it, then use `--profile desktop` instead of `--profile web` in the installation command. Reopen the desktop application after installation.
+
+For Web, restart that DSH profile and refresh the browser. **Claude SSH** should appear in Settings. The package includes compiled server code, the client module, and `cordis.patch.yml`; no build is required on the SSH target.
 
 The package is **not published to npm**. Install the generated `.tgz`, optionally copying it to the machine running DSH first. Direct installation from GitHub requires precompiled `lib` files, which are not committed in this repository.
 
 ## Configuration and use
 
 1. Open DSH Settings → **Claude SSH**.
-2. Add a host with a stable ID, such as `dev-mac`, a display name, and an SSH config alias or `user@host`. Optionally specify a port and an absolute Claude executable path.
+2. Select a connection under **从本机 SSH 配置选择** (Choose from local SSH config), or manually enter an SSH alias / `user@host`. Selecting an alias fills the target and supplies an ID/name for a new blank host. Save the host; optionally specify a port and an absolute Claude executable path.
 3. Select **测试连接与 Claude** (Test connection and Claude). This checks the target user, executable, version, authentication, and required CLI options through a real noninteractive SSH connection. It does **not** call a model.
 4. Select the saved host, browse or enter an absolute remote directory, and save the remote workspace. Empty directories are allowed. The directory must exist, be readable, and allow entry; `~` is not expanded.
 5. Choose `sonnet`, `opus`, or `haiku` for that workspace and create a remote session. These are CLI aliases resolved by the remote Claude installation.
@@ -50,6 +52,8 @@ The plugin uses system `ssh`, reusing keys, SSH Agent, known_hosts, SSH config, 
 For a new host, verify its fingerprint in a terminal and establish known_hosts first. The plugin always sets `StrictHostKeyChecking=yes` and never automatically trusts new keys. Leave the port field empty to use an alias's configured Port. Write literal IPv6 targets as `[::1]` or `user@[::1]`.
 
 The local machine can also be an SSH target if its SSH service and key authentication are configured. Installing this plugin does not enable SSH or change its configuration. The development machine's authorized loopback setup and removal instructions are recorded in [validation notes](docs/validation.md#本机-ssh-验收配置) (Chinese).
+
+The alias picker reads `~/.ssh/config`, recursive `Include` files, and `/etc/ssh/ssh_config` for the user running DSH. It supports common Include globs, quoted paths, `~`, `%d`, `%%`, and `${VARIABLE}`. Use **刷新 SSH 列表** (Refresh SSH list) after editing config. Only concrete Host aliases are listed; wildcard/negated rules and known_hosts entries are not connections. It does not read private keys or evaluate Match/ProxyCommand during listing. Conditional Includes are scanned as candidates; OpenSSH resolves actual conditions on connection. Dynamic host-dependent Include tokens and other users’ `~user` paths are skipped with a warning; manual entry remains available. If DSH runs on a server, the list belongs to that server user, not the browser computer.
 
 ### Noninteractive Claude environment
 
@@ -124,7 +128,7 @@ npm pack
 
 Tests use the Node test runner. Protocol fixtures replace Claude and consume no model quota. Directory tests run real zsh → POSIX sh commands, but fixture tests are not real SSH or Claude inference validation.
 
-Current results: type checking, **20 automated tests**, and the build pass. Real SSH to the local macOS machine verified installation, Claude detection, file-write approval, user questions, and continuation after a DSH restart. Linux, a second physical host, and interruption/cancellation of a real long-running task remain untested.
+Current results: type checking, **25 automated tests**, and the build pass. Real SSH to the local macOS machine verified installation, Claude detection, file-write approval, user questions, and continuation after a DSH restart. Linux, a second physical host, and interruption/cancellation of a real long-running task remain untested.
 
 See [real SSH acceptance steps](docs/acceptance.md), [interface investigation](docs/interfaces.md), and [validation results](docs/validation.md). These detailed documents are currently in Chinese.
 
