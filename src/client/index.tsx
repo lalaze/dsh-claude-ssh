@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import type { Host, StateView, Workspace } from '../domain.js';
 import type { SshAliases } from '../ssh-config.js';
 import { hostFromAlias } from './host-draft.js';
+import { loadSshAliases, aliasPlaceholder } from './ssh-aliases.js';
+import { Select } from './select.js';
+import { PLUGIN_VERSION } from '../version.js';
 
 // Narrow views of public 0.2.1-rc.2 client faces; source locations are documented in docs/interfaces.md.
 type Props = { sessionId?: string; matched?: { sessionId: string }; close?: () => void; useProjection?: (key: string, select: (v: any) => any) => any; useSession?: (select: (v: any) => any) => any };
@@ -48,7 +51,7 @@ export async function apply(ctx: Client): Promise<void> {
     const [aliases, setAliases] = useState<SshAliases>(); const [aliasError, setAliasError] = useState(''); const [loadingAliases, setLoadingAliases] = useState(false);
     const loadAliases = async () => {
       setLoadingAliases(true); setAliasError('');
-      try { setAliases(await api<SshAliases>({ action: 'sshAliases' })); }
+      try { setAliases(await loadSshAliases(api)); }
       catch (e) { setAliasError(e instanceof Error ? e.message : String(e)); }
       finally { setLoadingAliases(false); }
     };
@@ -66,13 +69,14 @@ export async function apply(ctx: Client): Promise<void> {
       {(error || message) && <div role="status" style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-primary, inherit)' }}>{message || error}</div>}
       <fieldset disabled={busy} style={card}><legend>SSH 主机</legend>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{data?.hosts.map(h => <button key={h.id} style={button} onClick={() => { setSelected(h.id); setHost(h); setListing(undefined); setMessage(''); }}>{h.name} / {h.destination}</button>)}</div>
-        <label>从本机 SSH 配置选择<select style={{ ...field, width: '100%' }} disabled={loadingAliases || !aliases?.aliases.length} value={aliases?.aliases.includes(host.destination) ? host.destination : ''} onChange={e => {
+        <label>从本机 SSH 配置选择<Select style={{ ...field, width: '100%' }} disabled={loadingAliases || !aliases?.aliases.length || Boolean(aliasError)} value={aliases?.aliases.includes(host.destination) ? host.destination : ''} onChange={e => {
           if (!e.target.value) return;
           editHost(hostFromAlias(host, e.target.value));
-        }}><option value="">{loadingAliases ? '正在读取 SSH 配置…' : aliases?.aliases.length ? '请选择 SSH 别名（也可在下方手动填写）' : '未发现 SSH 别名，可在下方手动填写'}</option>{aliases?.aliases.map(alias => <option key={alias} value={alias}>{alias}</option>)}</select></label>
+        }}><option value="">{aliasPlaceholder(loadingAliases, aliases, aliasError)}</option>{!aliasError && aliases?.aliases.map(alias => <option key={alias} value={alias}>{alias}</option>)}</Select></label>
         <div><button style={button} disabled={loadingAliases} onClick={() => void loadAliases()}>刷新 SSH 列表</button></div>
         <small>读取运行 DSH 的本机用户 ~/.ssh/config、Include 和系统 SSH 配置。选择后仍需保存、测试；用户、端口、密钥与跳板机由 OpenSSH 解析。不会列出通配规则或读取私钥。条件 Include 中的条目为候选，最终由 OpenSSH 解析。</small>
         {aliasError && <div role="alert">SSH 列表读取失败：{aliasError}；仍可手动填写。</div>}
+        <small>界面 {PLUGIN_VERSION} / 后端 {data?.plugin?.version ?? '未提供版本（旧版或尚未连接）'}{(aliases?.configPath ?? data?.plugin?.sshConfigPath) && <> · 配置文件：{aliases?.configPath ?? data?.plugin?.sshConfigPath}</>}</small>
         {aliases?.warnings.map(w => <div role="status" key={w}>{w}</div>)}
         <label>稳定标识（编辑时保持不变）<input style={{ ...field, width: '100%' }} value={host.id} onChange={e => editHost({ ...host, id: e.target.value })} placeholder="dev-mac" /></label>
         <label>显示名称<input style={{ ...field, width: '100%' }} value={host.name} onChange={e => editHost({ ...host, name: e.target.value })} /></label>
@@ -90,7 +94,7 @@ export async function apply(ctx: Client): Promise<void> {
         <div><button style={button} onClick={() => browse(path)}>浏览 / 验证目录</button>{' '}<button style={button} onClick={() => act(async () => { const w = await api<Workspace>({ action: 'createWorkspace', hostId: selected, path }); setMessage(`工作区已验证：${w.user} / ${w.path}`); })}>保存远程工作区</button></div>
         {listing && <div style={{ maxHeight: 240, overflow: 'auto' }}><div>{listing.user} / {listing.path}</div><button style={button} onClick={() => browse(listing.path.replace(/\/[^/]+\/?$/, '') || '/')}>上级目录</button>{listing.names.length === 0 && <p>空目录（可以作为工作区）</p>}{listing.names.map(n => <div key={n}><button style={button} onClick={() => browse(`${listing.path === '/' ? '' : listing.path}/${n}`)}>{n}</button></div>)}</div>}
       </fieldset>
-      <div style={card}><strong>已保存的远程工作区</strong><label>模型 <select style={field} value={model} onChange={e => setModel(e.target.value)}>{['sonnet', 'opus', 'haiku'].map(m => <option key={m}>{m}</option>)}</select></label>
+      <div style={card}><strong>已保存的远程工作区</strong><label>模型 <Select style={field} value={model} onChange={e => setModel(e.target.value)}>{['sonnet', 'opus', 'haiku'].map(m => <option key={m}>{m}</option>)}</Select></label>
         {data?.workspaces.map(w => <div key={w.id} style={{ overflowWrap: 'anywhere' }}><div>{identity(data.hosts.find(h => h.id === w.hostId), w)}</div><button style={button} disabled={busy} onClick={() => act(async () => { const r = await api<{ sessionId: string }>({ action: 'createSession', workspaceId: w.id, model }); open(r.sessionId); })}>创建远程会话</button>{' '}<button style={button} disabled={busy} onClick={() => { if (window.confirm('删除此工作区注册？绑定它的历史会话将停止可用。')) void act(() => api({ action: 'deleteWorkspace', workspaceId: w.id })); }}>删除注册</button></div>)}
       </div>
       <div style={card}><strong>远程会话</strong>{data && Object.values(data.bindings).map(b => <div key={b.sessionId}><div style={{ overflowWrap: 'anywhere' }}>{identity(data.hosts.find(h => h.id === b.hostId), b)}</div><small>{stateName[b.state]} · Claude {b.claudeSessionId}</small><div><button style={button} onClick={() => open(b.sessionId)}>打开会话</button></div></div>)}</div>
@@ -152,7 +156,7 @@ export async function apply(ctx: Client): Promise<void> {
     };
     return <div style={{ display: 'grid', gap: 8, padding: 12, maxWidth: 900, width: '100%', boxSizing: 'border-box', margin: '0 auto' }}><Dock {...props} sessionId={sessionId} />
       <textarea aria-label="Claude SSH 远端消息" rows={3} maxLength={50000} style={{ ...field, width: '100%', resize: 'vertical' }} placeholder="发送文本到此远程工作区（不上传本地文件）" value={draft} disabled={blocked || running || submitting} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} />
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><label>Claude SSH 模型 <select aria-label="Claude SSH 模型" style={field} value={b?.model ?? selection?.model ?? 'sonnet'} disabled={blocked || running || submitting} onChange={async e => { try { await api({ action: 'selectModel', sessionId, model: e.target.value }); } catch (e) { setMessage(String(e)); } }}>{['sonnet', 'opus', 'haiku'].map(m => <option key={m}>{m}</option>)}</select></label>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}><label>Claude SSH 模型 <Select aria-label="Claude SSH 模型" style={field} value={b?.model ?? selection?.model ?? 'sonnet'} disabled={blocked || running || submitting} onChange={async e => { try { await api({ action: 'selectModel', sessionId, model: e.target.value }); } catch (e) { setMessage(String(e)); } }}>{['sonnet', 'opus', 'haiku'].map(m => <option key={m}>{m}</option>)}</Select></label>
         <button style={button} disabled={blocked || running || submitting || !draft.trim()} onClick={() => void send()}>发送到远端</button>
         <button style={button} disabled={!running} onClick={async () => { try { await api({ action: 'cancel', sessionId }); } catch (e) { setMessage(String(e)); } }}>停止远端任务</button>
       </div>{message && <div role="alert">{message}</div>}

@@ -3,7 +3,7 @@ import { constants } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, resolve } from 'node:path';
 
-export interface SshAliases { aliases: string[]; warnings: string[] }
+export interface SshAliases { aliases: string[]; warnings: string[]; configPath?: string }
 const selectable = /^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$/;
 
 // Read only Host/Include directives. Never evaluate Match exec, ProxyCommand,

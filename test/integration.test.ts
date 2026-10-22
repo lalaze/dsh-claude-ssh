@@ -6,6 +6,7 @@ import { apply } from '../src/index.js';
 import { Manager } from '../src/manager.js';
 import { ClaudeSshAdapter } from '../src/adapter.js';
 import { fixture } from './helpers.js';
+import { PLUGIN_VERSION } from '../src/version.js';
 
 test('远程会话初始模型在发布前持久化；不调用全局默认模型或创建本地目录', async () => {
   const f = await fixture();
@@ -62,5 +63,12 @@ test('公开 waterfall 仅接管已绑定会话；普通本地会话完全委托
     await assert.rejects(handlers.get('agent/request')!({ agent: switched }, async () => request), { code: 'HOST_MISMATCH' });
     const state = await (await route.fetch(new Request('http://example.test/api/claude-ssh'))).json();
     assert.equal(state.bindings[f.binding.sessionId].path, f.path);
+    assert.equal(state.plugin.version, PLUGIN_VERSION);
+    assert.ok(state.plugin.capabilities.includes('sshAliases'));
+    const result = await route.fetch(new Request('http://example.test/api/claude-ssh', { method: 'POST', body: JSON.stringify({ action: 'sshAliases' }) }));
+    assert.equal(result.status, 200);
+    const aliases = await result.json();
+    assert.equal(aliases.ok, true); assert.ok(Array.isArray(aliases.value.aliases));
+    assert.equal(aliases.value.configPath, state.plugin.sshConfigPath);
   } finally { await f.dispose(); }
 });

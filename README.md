@@ -18,7 +18,7 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.1.tgz
+dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.2.tgz
 ```
 
 For **DSH Desktop**, open the application once to initialize its profile, fully quit it, then use `--profile desktop` instead of `--profile web` in the installation command. Reopen the desktop application after installation.
@@ -26,6 +26,10 @@ For **DSH Desktop**, open the application once to initialize its profile, fully 
 For Web, restart that DSH profile and refresh the browser. **Claude SSH** should appear in Settings. The package includes compiled server code, the client module, and `cordis.patch.yml`; no build is required on the SSH target.
 
 The package is **not published to npm**. Install the generated `.tgz`, optionally copying it to the machine running DSH first. Direct installation from GitHub requires precompiled `lib` files, which are not committed in this repository.
+
+## Upgrading
+
+Fully quit DSH Desktop before installing a new package into `--profile desktop`, then reopen it. Closing only the window may leave the old backend running while updated client files load. For Web, restart the backend of the profile you updated and refresh the browser. The SSH settings show client/server versions and the actual SSH config path. A version mismatch or unsupported refresh request is an update/loading error, not evidence that your SSH config is empty.
 
 ## Configuration and use
 
@@ -93,6 +97,7 @@ The plugin does not automatically reconnect, retry, or resend sent messages. Che
 
 | Error | What to check |
 |---|---|
+| SSH list: version mismatch / unknown operation | Fully quit DSH, install the same plugin version into the correct profile, then reopen. Compare the displayed client/server versions and config path. |
 | `WORKSPACE_REQUIRED` | Create a session from a verified workspace in Claude SSH settings. |
 | `HOST_MISMATCH` / `BINDING_CHANGED` | The selected model belongs to another host, or the binding is stale. Create a new valid binding. |
 | `REMOTE_DIRECTORY` | Directory existence, read/execute permissions, and changed symlink targets. Failure never falls back to HOME. |
@@ -128,7 +133,7 @@ npm pack
 
 Tests use the Node test runner. Protocol fixtures replace Claude and consume no model quota. Directory tests run real zsh → POSIX sh commands, but fixture tests are not real SSH or Claude inference validation.
 
-Current results: type checking, **25 automated tests**, and the build pass. Real SSH to the local macOS machine verified installation, Claude detection, file-write approval, user questions, and continuation after a DSH restart. Linux, a second physical host, and interruption/cancellation of a real long-running task remain untested.
+Current results: type checking, **30 automated tests**, and the build pass. Real SSH to the local macOS machine verified installation, Claude detection, file-write approval, user questions, and continuation after a DSH restart. Linux, a second physical host, and interruption/cancellation of a real long-running task remain untested.
 
 See [real SSH acceptance steps](docs/acceptance.md), [interface investigation](docs/interfaces.md), and [validation results](docs/validation.md). These detailed documents are currently in Chinese.
 

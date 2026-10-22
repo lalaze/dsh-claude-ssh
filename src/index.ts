@@ -7,6 +7,7 @@ import { SessionId } from '@deepseek-ai/dsh-session';
 import { Store } from './store.js';
 import { Ssh } from './ssh.js';
 import { discoverSshAliases } from './ssh-config.js';
+import { PLUGIN_VERSION } from './version.js';
 import { ClaudeSshAdapter } from './adapter.js';
 import { Manager } from './manager.js';
 import { providerFor, route, SshClaudeError } from './domain.js';
@@ -69,12 +70,12 @@ export async function apply(ctx: Context, config: { stateDir?: string } = {}): P
         for (const b of Object.values(state.bindings)) {
           try { route(state, b.sessionId, providerFor(b.hostId)); } catch (e) { routeErrors[b.sessionId] = e instanceof Error ? e.message : '绑定无效'; }
         }
-        return Response.json({ ...state, routeErrors }, { headers: { 'Cache-Control': 'no-store' } });
+        return Response.json({ ...state, routeErrors, plugin: { version: PLUGIN_VERSION, capabilities: ['sshAliases'], sshConfigPath: join(homedir(), '.ssh', 'config') } }, { headers: { 'Cache-Control': 'no-store' } });
       }
       const raw = await request.text(); if (Buffer.byteLength(raw) > 256 * 1024) throw new Error('请求过大');
       const b = JSON.parse(raw); let value: unknown;
       switch (b.action) {
-        case 'sshAliases': value = await discoverSshAliases(); break;
+        case 'sshAliases': value = { ...await discoverSshAliases(), configPath: join(homedir(), '.ssh', 'config') }; break;
         case 'saveHost': value = await manager.saveHost(b.host); break;
         case 'deleteHost': await manager.deleteHost(text(b.hostId)); break;
         case 'probe': value = await ssh.probe(manager.host(text(b.hostId)), request.signal); break;

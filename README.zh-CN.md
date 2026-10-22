@@ -18,7 +18,7 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.1.tgz
+dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.2.tgz
 ```
 
 安装到 **DSH 桌面端**：先打开应用一次以初始化 profile，完全退出后，将上述命令的 `--profile web` 改为 `--profile desktop` 执行，再重新打开桌面应用。
@@ -26,6 +26,10 @@ dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.1.tgz
 Web 端请重启对应 DSH profile，然后刷新浏览器。设置菜单中应出现 **Claude SSH**。插件未发布至 npm；不要使用 `dsh plugin add dsh-claude-ssh` 假定已有公开包。包内含编译产物、客户端模块与 `cordis.patch.yml`，安装无需远端构建。
 
 也可把打包文件传到目标 DSH 主机再执行安装命令。GitHub 安装需仓库包含预编译 `lib`，因此首版推荐 `.tgz`。
+
+## 升级
+
+升级桌面端前请完全退出 DSH，再安装新包到 `--profile desktop` 并重新打开。只关闭窗口可能留下旧后端进程，而界面已加载新的文件。Web 端请重启实际更新的 profile 后端并刷新浏览器。SSH 设置会显示界面/后端版本和实际读取的 SSH 配置路径；版本不匹配或刷新返回“未知操作”属于更新/加载问题，不能据此认定本机没有 SSH 配置。
 
 ## 配置与使用
 
@@ -93,6 +97,7 @@ DSH 0.2.1-rc.2 的原生历史与冷恢复接口要求 Session header 存在 cwd
 
 | 提示 | 检查 |
 |---|---|
+| SSH 列表版本不匹配 / 未知操作 | 完全退出 DSH，将同版本插件装入正确 profile 后重开；核对页面显示的前后端版本与配置路径 |
 | `WORKSPACE_REQUIRED` | 在 Claude SSH 设置中选择已验证工作区并新建会话 |
 | `HOST_MISMATCH` / `BINDING_CHANGED` | 所选模型属于其他主机，或绑定已失效；不要更改旧绑定 |
 | `REMOTE_DIRECTORY` | 远端目录存在、读权限、执行权限、符号链接目标是否改变；失败绝不回退 HOME |
@@ -128,7 +133,7 @@ npm pack
 
 测试采用 Node test runner。核心协议夹具代替 Claude、不消耗额度；目录测试通过真实 zsh → POSIX sh 执行，但不能把这些夹具测试称为真实 SSH / Claude 推理测试。
 
-当前验证结果：类型检查、25 项自动测试和构建通过；macOS 本机经真实 SSH 完成安装、Claude 检测、文件写入权限确认、用户问题与重启后续接。Linux、第二台物理主机以及真实长任务断线/取消尚未实测。
+当前验证结果：类型检查、30 项自动测试和构建通过；macOS 本机经真实 SSH 完成安装、Claude 检测、文件写入权限确认、用户问题与重启后续接。Linux、第二台物理主机以及真实长任务断线/取消尚未实测。
 
 真实 SSH 验收步骤见 [docs/acceptance.md](docs/acceptance.md)，实际接口调查见 [docs/interfaces.md](docs/interfaces.md)，本次验证记录见 [docs/validation.md](docs/validation.md)。
 

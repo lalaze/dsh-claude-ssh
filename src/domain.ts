@@ -14,7 +14,10 @@ export interface Binding {
   routingCwd?: string;
 }
 export interface State { version: 1; hosts: Host[]; workspaces: Workspace[]; bindings: Record<string, Binding> }
-export interface StateView extends State { routeErrors: Record<string, string> }
+export interface StateView extends State {
+  routeErrors: Record<string, string>;
+  plugin?: { version: string; capabilities: string[]; sshConfigPath: string };
+}
 export const emptyState = (): State => ({ version: 1, hosts: [], workspaces: [], bindings: {} });
 export function absolutePath(value: string): string {
   if (!value.startsWith('/') || /[\0\r\n]/.test(value)) throw new SshClaudeError('BAD_PATH', '请输入远端绝对路径（不支持换行或 NUL）。');
