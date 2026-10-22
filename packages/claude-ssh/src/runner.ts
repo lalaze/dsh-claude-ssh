@@ -73,15 +73,18 @@ export async function* runTurn(ssh: Ssh, o: RunOptions): AsyncGenerator<StreamCh
       if (frame.type === 'result') { result = frame; clearTimeout(started); break; }
       if (!o.signal.aborted) for (const chunk of translator.feed(frame)) yield chunk;
     }
-    if (o.signal.aborted) throw new SshClaudeError('CANCELLED', '已取消；已发送远端中断。若连接已断开，远端是否停止仍需检查。');
     if (result) {
       if (result.session_id && result.session_id !== o.binding.claudeSessionId) throw new SshClaudeError('SESSION_MISMATCH', '远端结果 session ID 不匹配。');
       if (!gotInit) throw new SshClaudeError('CLAUDE_PROTOCOL', 'Claude 未发送初始化帧。');
-      if (result.is_error || result.subtype !== 'success') throw new SshClaudeError('CLAUDE_ERROR', `远端 Claude：${(result.errors ?? [result.result ?? result.subtype]).join('\n')}`);
       const u = result.usage;
-      if (u && typeof u.input_tokens === 'number' && typeof u.output_tokens === 'number') yield { type: 'usage', usage: { inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0 } };
+      // Even an error/cancelled result may contain billable work. Publish only
+      // validated counters, before surfacing the terminal failure to the adapter.
+      if (u && [u.input_tokens, u.output_tokens, u.cache_read_input_tokens ?? 0, u.cache_creation_input_tokens ?? 0].every(n => Number.isSafeInteger(n) && n >= 0)) yield { type: 'usage', usage: { inputTokens: u.input_tokens, outputTokens: u.output_tokens, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0 } };
+      if (o.signal.aborted) throw new SshClaudeError('CANCELLED', '已取消；已发送远端中断。若连接已断开，远端是否停止仍需检查。');
+      if (result.is_error || result.subtype !== 'success') throw new SshClaudeError('CLAUDE_ERROR', `远端 Claude：${(result.errors ?? [result.result ?? result.subtype]).join('\n')}`);
       return;
     }
+    if (o.signal.aborted) throw new SshClaudeError('CANCELLED', '已取消；已发送远端中断。若连接已断开，远端是否停止仍需检查。');
     const code = await exit;
     if (spawnError) throw spawnError;
     throw classify(code, stderr);

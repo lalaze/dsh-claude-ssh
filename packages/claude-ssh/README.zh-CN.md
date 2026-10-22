@@ -18,7 +18,7 @@ cd dsh-plugins
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-claude-ssh check
 corepack pnpm --filter dsh-claude-ssh pack:plugin
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.6.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.7.tgz"
 ```
 
 安装到 **DSH 桌面端**：先打开应用一次以初始化 profile，完全退出后，将上述命令的 `--profile web` 改为 `--profile desktop` 执行，再重新打开桌面应用。

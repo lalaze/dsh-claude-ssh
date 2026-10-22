@@ -26,6 +26,7 @@ test('stream-json 流式输出、工具结果无本地执行、会话续接', as
     const a = new ClaudeSshAdapter(context().ctx, f.store, f.ssh);
     const chunks = await collect(a.stream(options(f.binding.sessionId)));
     assert.equal(finish(chunks)?.kind, 'stop');
+    assert.deepEqual(chunks.filter(c => c.type === 'usage'), [{ type: 'usage', usage: { inputTokens: 2, outputTokens: 3, cacheReadTokens: 7, cacheWriteTokens: 11 } }]);
     assert.equal(chunks.filter(c => c.type === 'text-delta').map(c => c.text).join(''), f.path);
     assert.ok(chunks.some(c => c.type === 'reasoning-delta' && c.text.includes('真实夹具结果')));
     assert.ok(chunks.every(c => c.type !== 'tool-call-delta'));
@@ -34,6 +35,15 @@ test('stream-json 流式输出、工具结果无本地执行、会话续接', as
     assert.ok(launchScript({ binding: b, binary: f.binary, model: 'sonnet' }).includes("'--resume'"));
     assert.equal(finish(await collect(a.stream(options(f.binding.sessionId))))?.kind, 'stop');
     assert.equal(f.store.snapshot().bindings[f.binding.sessionId].claudeSessionId, f.binding.claudeSessionId);
+  } finally { await f.dispose(); }
+});
+test('远端失败仍转发已经发生的 Token 与缓存用量', async () => {
+  const f = await fixture('usage-error');
+  try {
+    const adapter = new ClaudeSshAdapter(context().ctx, f.store, f.ssh);
+    const chunks = await collect(adapter.stream(options(f.binding.sessionId)));
+    assert.equal(finish(chunks)?.kind, 'error');
+    assert.deepEqual(chunks.filter(c => c.type === 'usage'), [{ type: 'usage', usage: { inputTokens: 2, outputTokens: 3, cacheReadTokens: 7, cacheWriteTokens: 11 } }]);
   } finally { await f.dispose(); }
 });
 test('权限请求经 DSH 确认并通过 stdio 回传；拒绝不会自动放行', async () => {

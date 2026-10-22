@@ -7,6 +7,7 @@
 | 插件 | 目录 | 功能 |
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.zh-CN.md) | 在 DSH 中通过系统 OpenSSH 使用远端 Claude Code |
+| `dsh-usage-stats` | [packages/usage-stats](packages/usage-stats/README.zh-CN.md) | 统计 DSH 模型与 Claude SSH 远端调用的 Token 用量，支持筛选、分组和 CSV 导出 |
 
 ## 初始化
 
@@ -47,7 +48,7 @@ pnpm --filter dsh-claude-ssh pack:plugin
 
 ```sh
 pnpm pack:plugins
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.6.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.7.tgz"
 ```
 
 桌面端请完全退出 DSH，将参数改为 `--profile desktop` 后安装并重新打开。Web 端请重启更新的 profile 并刷新浏览器。插件目前未发布到 npm。仓库根目录是私有工作区，安装时应使用各插件的压缩包。
@@ -57,6 +58,7 @@ dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.6.tgz"
 ```text
 packages/
   claude-ssh/           # dsh-claude-ssh 的源码、测试、清单和文档
+  usage-stats/          # DSH 与 Claude SSH 使用量统计
 scripts/
   build-client.mjs      # 共用的 DSH Web 客户端打包脚本
 tsconfig.base.json     # 共用 TypeScript 编译选项

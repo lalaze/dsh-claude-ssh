@@ -42,7 +42,7 @@ rl.on('line', raw => {
     emit({type:'stream_event',event:{type:'content_block_stop',index:0}});
     emit({type:'assistant',message:{content:[{type:'text',text:process.cwd()},{type:'tool_use',id:'t1',name:'Read',input:{file_path:'README.md'}}]}});
     emit({type:'user',message:{content:[{type:'tool_result',tool_use_id:'t1',content:'真实夹具结果'}]}});
-    emit({type:'result',subtype:'success',session_id:session,usage:{input_tokens:2,output_tokens:3}});
+    emit({type:'result',subtype:mode === 'usage-error' ? 'error_during_execution' : 'success',is_error:mode === 'usage-error',session_id:session,usage:{input_tokens:2,output_tokens:3,cache_read_input_tokens:7,cache_creation_input_tokens:11}});
   }
   if (f.type === 'control_response') {
     emit({type:'assistant',message:{content:[{type:'text',text:JSON.stringify(f.response)}]}});

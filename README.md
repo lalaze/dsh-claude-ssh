@@ -7,6 +7,7 @@ A pnpm workspace for independently versioned DeepSeek Harness plugins. Each plug
 | Package | Directory | Description |
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.md) | Use remote Claude Code over system OpenSSH in DSH |
+| `dsh-usage-stats` | [packages/usage-stats](packages/usage-stats/README.md) | Track DSH and Claude SSH token usage with filters, grouped reports and CSV export |
 
 ## Setup
 
@@ -47,7 +48,7 @@ Install an individual built archive into the desired DSH profile:
 
 ```sh
 pnpm pack:plugins
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.6.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.1.7.tgz"
 ```
 
 For Desktop, fully quit DSH and use `--profile desktop`, then reopen the app. For Web, restart the updated profile and refresh the browser. Plugins are not currently published to npm. The repository root is a private workspace; install individual plugin archives rather than the GitHub root.
@@ -57,6 +58,7 @@ For Desktop, fully quit DSH and use `--profile desktop`, then reopen the app. Fo
 ```text
 packages/
   claude-ssh/           # dsh-claude-ssh: source, tests, manifest, docs
+  usage-stats/          # DSH and Claude SSH usage statistics
 scripts/
   build-client.mjs      # Shared DSH web client bundler
 tsconfig.base.json     # Shared TypeScript compiler options
