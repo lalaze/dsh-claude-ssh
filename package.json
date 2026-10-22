@@ -18,7 +18,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lalaze/dsh-claude-ssh.git"
+    "url": "git+https://github.com/lalaze/dsh-plugins.git"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

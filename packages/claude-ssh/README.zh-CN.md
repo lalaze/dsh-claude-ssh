@@ -13,8 +13,8 @@
 插件位于[大仓](../../README.zh-CN.md)的 `packages/claude-ssh`。以下命令均在仓库根目录执行：
 
 ```sh
-git clone https://github.com/lalaze/dsh-claude-ssh.git
-cd dsh-claude-ssh
+git clone https://github.com/lalaze/dsh-plugins.git
+cd dsh-plugins
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-claude-ssh check
 corepack pnpm --filter dsh-claude-ssh pack:plugin

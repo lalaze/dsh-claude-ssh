@@ -13,8 +13,8 @@ The first release targets **DSH 0.2.1-rc.2, Node.js ≥ 22.15, and macOS / Linux
 This plugin lives in `packages/claude-ssh` within the [plugin workspace](../../README.md). Run these commands at the repository root to build and install from source:
 
 ```sh
-git clone https://github.com/lalaze/dsh-claude-ssh.git
-cd dsh-claude-ssh
+git clone https://github.com/lalaze/dsh-plugins.git
+cd dsh-plugins
 corepack pnpm install --frozen-lockfile
 corepack pnpm --filter dsh-claude-ssh check
 corepack pnpm --filter dsh-claude-ssh pack:plugin
