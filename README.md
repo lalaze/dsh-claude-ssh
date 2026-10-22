@@ -18,7 +18,7 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.4.tgz
+dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.6.tgz
 ```
 
 For **DSH Desktop**, open the application once to initialize its profile, fully quit it, then use `--profile desktop` instead of `--profile web` in the installation command. Reopen the desktop application after installation.

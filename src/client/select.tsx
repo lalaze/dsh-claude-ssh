@@ -1,5 +1,4 @@
 import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { selectStyles } from './select-styles.js';
 
 export interface SelectOption { value: string; label: string }
@@ -24,7 +23,7 @@ function Icon({ name }: { name: 'chevron' | 'search' | 'check' | 'ssh' }) {
   </svg>;
 }
 
-/** Use the trigger's document: settings may render in a separate window/document. */
+/** Render in place so host focus containment includes both the search and options. */
 export function Select({ value, options, onValueChange, placeholder = '请选择', disabled, searchable, kind, style, 'aria-label': label }: SelectProps): React.ReactElement {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -51,6 +50,9 @@ export function Select({ value, options, onValueChange, placeholder = '请选择
     const doc = trigger.current?.ownerDocument;
     const view = doc?.defaultView;
     if (!doc || !view) return;
+    // Keep DOM membership in the modal, but escape its clipping and transformed coordinates.
+    panel.current?.setAttribute('popover', 'manual');
+    panel.current?.showPopover();
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect();
       if (!rect) return;
@@ -75,7 +77,9 @@ export function Select({ value, options, onValueChange, placeholder = '请选择
     if (!doc || !view) return;
     const outside = (event: Event) => {
       const target = event.target as Node;
-      if (!trigger.current?.contains(target) && !panel.current?.contains(target)) setOpen(false);
+      const path = event.composedPath();
+      const inside = [trigger.current, panel.current].some(element => element && (path.includes(element) || element.contains(target)));
+      if (!inside) setOpen(false);
     };
     const blur = () => setOpen(false);
     doc.addEventListener('pointerdown', outside, true);
@@ -108,7 +112,7 @@ export function Select({ value, options, onValueChange, placeholder = '请选择
       <span className="dsh-ssh-select-value" data-placeholder={!selected}>{selected?.label ?? placeholder}</span>
       <span className="dsh-ssh-select-chevron"><Icon name="chevron" /></span>
     </button>
-    {open && trigger.current && createPortal(<div ref={panel} className="dsh-ssh-select-panel" style={position} onKeyDown={navigate}>
+    {open && <div ref={panel} className="dsh-ssh-select-panel" style={position} onKeyDown={navigate} onClick={event => event.preventDefault()}>
       {searchable && <div className="dsh-ssh-select-search"><Icon name="search" /><input ref={search} aria-label={`搜索${label}`} role="searchbox" aria-controls={`${id}-list`} aria-activedescendant={filtered[activeIndex] ? `${id}-option-${activeIndex}` : undefined} placeholder="搜索 SSH 别名…" value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} /><kbd>esc</kbd></div>}
       <div ref={list} className="dsh-ssh-select-list" role="listbox" id={`${id}-list`} aria-label={label}>
         {filtered.map((option, index) => <div key={option.value} id={`${id}-option-${index}`} className="dsh-ssh-select-option" role="option" aria-selected={option.value === value} data-active={index === activeIndex} onPointerMove={() => setActive(index)} onPointerDown={event => event.preventDefault()} onClick={() => choose(option)}>
@@ -119,6 +123,6 @@ export function Select({ value, options, onValueChange, placeholder = '请选择
         {filtered.length === 0 && <div className="dsh-ssh-select-empty" role="status">没有匹配的连接</div>}
       </div>
       {searchable && <div className="dsh-ssh-select-footer"><span>{filtered.length} 个连接</span><span>↑↓ 选择 <span className="dsh-ssh-select-hint">↵ 确认</span></span></div>}
-    </div>, trigger.current.ownerDocument.body)}
+    </div>}
   </span>;
 }

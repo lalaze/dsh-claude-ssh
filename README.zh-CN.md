@@ -18,7 +18,7 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.4.tgz
+dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.6.tgz
 ```
 
 安装到 **DSH 桌面端**：先打开应用一次以初始化 profile，完全退出后，将上述命令的 `--profile web` 改为 `--profile desktop` 执行，再重新打开桌面应用。

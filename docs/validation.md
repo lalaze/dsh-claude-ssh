@@ -74,3 +74,19 @@
 另复现并修正了补丁版本不一致时严格禁用 SSH 列表的独立问题：后端声明支持接口且响应有效时允许选择，保留更新警告；不支持接口时仍明确报错。31 项模块测试、类型检查及构建通过。UI 回归单独使用 `npm run test:ui`，需要 agent-browser / Chrome，不连接 SSH、不调用模型。
 
 最终验证：UI 回归脚本通过同文档/独立文档真实鼠标打开与选择、菜单归属与视口定位、焦点返回、搜索/回车、Esc、菜单外点击，并覆盖图标/文字/箭头三个点击区域。实际隔离 DSH Web 表单的三处点击、鼠标选中并填入 SSH 目标通过；回放兼容 0.1.3 后端元数据后仍可展开，显示更新警告。未直接测试用户 Mac 的桌面载体，未调用 Claude 或修改 SSH 配置。
+
+## 0.1.5 模态容器中的下拉交互
+
+用户更新至界面/后端均为 0.1.4 后仍报告点击无反应。新增 Chrome 真实鼠标回归：将选择框放入 `showModal()` 打开的原生 dialog；旧版菜单挂载到 body，位于模态交互范围之外，无法正常获取焦点和接收点击。该测试复现了一个确定的模态集成错误，尚不能据此断言用户桌面窗口的故障只有这一种原因。
+
+菜单现在优先挂载到按钮所属的原生/ARIA 模态容器；使用手动 Popover API 提升到浏览器顶层，同时保留 DOM 归属，避免模态外元素不可交互、祖先 overflow 裁切及 transform 改变 fixed 定位。无模态时保留所属文档，并兼容 ShadowRoot；外部事件判断使用 composedPath，避免开放 Shadow DOM 的事件重定向误关菜单。Popover 属性通过 DOM API 设置，以兼容现有 React 18 类型。
+
+回归先验证直接挂载到带 transform 的 dialog 会偏移，再验证顶层菜单与触发按钮的视口坐标对齐、可命中、鼠标选中和搜索/回车。原有同文档、独立文档、焦点返回、Esc、外部点击及三个点击区域验证继续通过。UI 脚本另修正新版 agent-browser 下跨次 eval 的顶层变量重声明，并在点击前滚动目标进入视口。类型检查、31 项模块测试和构建均通过；本轮浏览器使用临时 agent-browser 0.39.1 和本机 Chrome，没有连接 SSH、调用模型或修改 SSH 配置。实际桌面窗口仍需加载新包后验收。
+
+## 0.1.6 Codex UI 设置页焦点兼容
+
+继续检查用户安装的 `@michengai/dsh-codex-ui@1.1.45`，发现截图中的全屏设置是 `CodexSettingsPage`，其根节点为 `role="region"`，并非原生/ARIA dialog。该组件的 `keepFocus` 允许设置页内的元素以及已识别的 dialog/menu/listbox；旧菜单 portal 位于设置页外，搜索框又是 listbox 的兄弟节点，因此搜索自动聚焦后被重定向到设置页返回按钮，Select 的外部焦点监听立即关闭菜单。仅匹配 dialog 的 0.1.5 没有覆盖这个实际宿主。
+
+修复为菜单直接在 Select 根节点内渲染，继续通过手动 Popover API 在浏览器顶层显示。搜索和选项保持设置页 DOM 归属，不再依赖识别第三方设置容器；同时在菜单 click 上阻止原生 label 默认激活，避免鼠标选中、页脚及空结果区域点击使触发按钮重复开关。未修改 Codex UI 插件代码或配置。
+
+新增可选集成回归：通过 `DSH_TEST_CODEX_CLIENT=/已安装插件/lib/client.js npm run test:ui` 读取真实已安装 bundle，仅在测试内存中暴露并渲染它的 `CodexSettingsPage`；宿主图标及连接指示器使用无交互桩，设置页 DOM、样式、隔离与焦点逻辑均使用原实现。修复前 0.1.5 在此场景稳定报 `Actual Codex settings redirected search focus and closed the popup after clicking`；修复后真实鼠标展开/选择、搜索回车、Esc 仅关菜单、页脚/空结果点击和无 label 重复激活均通过。同文档、独立文档、带 transform 的原生模态回归、类型检查、31 项测试及构建继续通过。此验证使用真实第三方组件的隔离浏览器页面，未直接自动化当前 Electron 窗口。

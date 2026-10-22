@@ -1,6 +1,6 @@
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, writeFile, rm, access } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, access, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -26,12 +26,13 @@ function browser(...args) {
   if (!result.success) throw new Error(result.error ?? 'Browser command failed');
   return result.data;
 }
-const evaluate = source => browser('eval', '-b', Buffer.from(source).toString('base64')).result;
+const evaluate = source => browser('eval', '-b', Buffer.from(`(() => eval(${JSON.stringify(source)}))()`).toString('base64')).result;
 const click = (selector, frame = false, area = 'center') => {
   const point = evaluate(`(() => {
     const frame = document.getElementById('settings-frame');
     const doc = ${frame ? 'frame.contentDocument' : 'document'};
     const target = doc.querySelector(${JSON.stringify(selector)});
+    target.scrollIntoView({ block: 'nearest' });
     const rect = target.getBoundingClientRect();
     const x = Math.round(rect.left + ${area === 'left' ? '12' : area === 'right' ? 'rect.width - 12' : 'rect.width / 2'});
     const y = Math.round(rect.top + rect.height / 2);
@@ -42,7 +43,14 @@ const click = (selector, frame = false, area = 'center') => {
   browser('mouse', 'move', String(point.x), String(point.y)); browser('mouse', 'down'); browser('mouse', 'up');
 };
 try {
-  const result = await build({ absWorkingDir: root, entryPoints: ['test/ui/select.fixture.tsx'], bundle: true, write: false, platform: 'browser', format: 'iife' });
+  const codexClientPath = process.env.DSH_TEST_CODEX_CLIENT;
+  let codexSource = '';
+  if (codexClientPath) {
+    const installed = await readFile(codexClientPath, 'utf8');
+    if (!installed.includes('function CodexSettingsPage(') || !installed.includes('exports.apply = apply;')) throw new Error('Unsupported Codex UI test bundle');
+    codexSource = installed.replace('exports.apply = apply;', 'exports.__TestSettingsPage = CodexSettingsPage; exports.apply = apply;');
+  }
+  const result = await build({ absWorkingDir: root, entryPoints: ['test/ui/select.fixture.tsx'], bundle: true, write: false, platform: 'browser', format: 'iife', define: { __CODEX_CLIENT_SOURCE__: JSON.stringify(codexSource) } });
   const html = '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#181818;color:#eee;font:14px system-ui}label{display:grid;gap:8px}output{display:block;min-height:24px}</style></head><body><script>' + result.outputFiles[0].text.replaceAll('</script', '<\\/script') + '</script></body></html>';
   const file = join(temp, 'index.html'); await writeFile(file, html);
   browser(...(executable ? ['--executable-path', executable] : []), '--allow-file-access', 'open', pathToFileURL(file).href);
@@ -78,7 +86,50 @@ try {
     evaluate(`if (!document.getElementById('settings-frame').contentDocument.querySelector('.dsh-ssh-select-panel')) throw new Error('Trigger click region failed: ${area}');`);
     browser('press', 'Escape');
   }
-  console.log('PASS: same-document and separate-document mouse open/select, viewport placement, focus, search, Enter, Escape, outside click');
+  click('#open-modal');
+  click('#modal-picker [role=combobox]');
+  evaluate(`const popup=document.querySelector('.dsh-ssh-select-panel');
+    if (!popup?.closest('dialog')) throw new Error('Modal popup escaped its dialog and is inert behind the native modal layer');
+    const rect=popup.getBoundingClientRect(), trigger=document.querySelector('#modal-picker [role=combobox]').getBoundingClientRect();
+    if (Math.abs(rect.left-trigger.left)>1 || Math.abs(rect.top-trigger.bottom-6)>4) throw new Error('Transformed modal changed popup viewport coordinates');
+    if (!popup.contains(document.elementFromPoint(rect.left+12, rect.top+12))) throw new Error('Modal popup cannot receive pointer input');`);
+  browser('wait', '--fn', 'document.activeElement?.getAttribute("role")==="searchbox"');
+  click('[role=option]:nth-child(2)');
+  evaluate(`if (document.getElementById('modal-picker-value').textContent !== 'beta-ssh') throw new Error('Modal mouse selection failed');`);
+  click('#modal-picker [role=combobox]');
+  browser('wait', '--fn', 'document.activeElement?.getAttribute("role")==="searchbox"');
+  browser('keyboard', 'type', 'gamma'); browser('press', 'Enter');
+  evaluate(`if (document.getElementById('modal-picker-value').textContent !== 'gamma-ssh') throw new Error('Modal search/Enter failed');`);
+  click('#close-modal');
+  if (codexClientPath) {
+    click('[data-dcu-settings-trigger]');
+    browser('wait', '--fn', 'Boolean(document.querySelector("#codex-picker [role=combobox]"))');
+    click('#codex-picker [role=combobox]');
+    evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    evaluate(`if (!document.querySelector('.dsh-ssh-select-panel') || document.activeElement?.getAttribute('role') !== 'searchbox') throw new Error('Actual Codex settings redirected search focus and closed the popup after clicking');`);
+    click('.dsh-ssh-select-footer');
+    evaluate(`if (!document.querySelector('.dsh-ssh-select-panel')) throw new Error('Popup footer click activated the wrapping label');`);
+    click('[role=option]:nth-child(2)');
+    evaluate(`if (document.getElementById('codex-picker-value').textContent !== 'beta-ssh') throw new Error('Codex settings mouse selection failed');
+      if (document.querySelector('.dsh-ssh-select-panel')) throw new Error('Selection reopened the popup through label activation');`);
+    click('#codex-picker [role=combobox]');
+    browser('wait', '--fn', 'document.activeElement?.getAttribute("role")==="searchbox"');
+    browser('keyboard', 'type', 'no-such-connection');
+    click('.dsh-ssh-select-empty');
+    evaluate(`if (!document.querySelector('.dsh-ssh-select-panel')) throw new Error('Popup empty-state click activated the wrapping label');`);
+    click('[role=searchbox]');
+    browser('fill', '[role=searchbox]', 'gamma'); browser('press', 'Enter');
+    evaluate(`if (document.getElementById('codex-picker-value').textContent !== 'gamma-ssh') throw new Error('Codex settings search/Enter failed');`);
+    click('#codex-picker [role=combobox]'); browser('press', 'Escape');
+    evaluate(`if (!document.querySelector('[data-dcu-settings-page]')) throw new Error('Escape closed settings instead of the popup');
+      if (document.querySelector('.dsh-ssh-select-panel')) throw new Error('Escape did not close the Codex popup');`);
+    console.log('PASS: installed Codex UI settings component mouse open/select, search, Enter, Escape, focus containment and no label reactivation');
+  }
+  console.log('PASS: same-document, separate-document and modal mouse open/select, viewport placement, focus, search, Enter, Escape, outside click');
+} catch (error) {
+  try { console.error('Browser errors:', JSON.stringify(browser('errors'))); } catch {}
+  try { console.error('Picker state:', JSON.stringify(evaluate(`({ active: document.activeElement?.outerHTML, search: document.querySelector('.dsh-ssh-select-search input')?.value, selected: document.getElementById('codex-picker-value')?.textContent })`))); } catch {}
+  throw error;
 } finally {
   try { browser('close'); } catch {}
   await rm(temp, { recursive: true, force: true });
