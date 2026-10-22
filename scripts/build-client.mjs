@@ -1,2 +1,2 @@
 import { build } from 'esbuild';
-await build({entryPoints:['src/client/index.tsx'],outfile:'lib/client.js',bundle:true,format:'cjs',platform:'browser',minify:true,external:['react','react/jsx-runtime','@deepseek-ai/*'],banner:{js:'window.__ModuleLoader__.load({id:"dsh-claude-ssh",factory:(require)=>{var module={exports:{}};var exports=module.exports;'},footer:{js:'return module.exports;}});'}});
+await build({entryPoints:['src/client/index.tsx'],outfile:'lib/client.js',bundle:true,format:'cjs',platform:'browser',minify:true,external:['react','react/jsx-runtime','react-dom','@deepseek-ai/*'],banner:{js:'window.__ModuleLoader__.load({id:"dsh-claude-ssh",factory:(require)=>{var module={exports:{}};var exports=module.exports;'},footer:{js:'return module.exports;}});'}});

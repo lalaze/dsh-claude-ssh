@@ -18,7 +18,7 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.2.tgz
+dsh plugin --profile web add /absolute/path/dsh-claude-ssh-0.1.3.tgz
 ```
 
 For **DSH Desktop**, open the application once to initialize its profile, fully quit it, then use `--profile desktop` instead of `--profile web` in the installation command. Reopen the desktop application after installation.
@@ -57,7 +57,7 @@ For a new host, verify its fingerprint in a terminal and establish known_hosts f
 
 The local machine can also be an SSH target if its SSH service and key authentication are configured. Installing this plugin does not enable SSH or change its configuration. The development machine's authorized loopback setup and removal instructions are recorded in [validation notes](docs/validation.md#本机-ssh-验收配置) (Chinese).
 
-The alias picker reads `~/.ssh/config`, recursive `Include` files, and `/etc/ssh/ssh_config` for the user running DSH. It supports common Include globs, quoted paths, `~`, `%d`, `%%`, and `${VARIABLE}`. Use **刷新 SSH 列表** (Refresh SSH list) after editing config. Only concrete Host aliases are listed; wildcard/negated rules and known_hosts entries are not connections. It does not read private keys or evaluate Match/ProxyCommand during listing. Conditional Includes are scanned as candidates; OpenSSH resolves actual conditions on connection. Dynamic host-dependent Include tokens and other users’ `~user` paths are skipped with a warning; manual entry remains available. If DSH runs on a server, the list belongs to that server user, not the browser computer.
+The alias picker reads `~/.ssh/config`, recursive `Include` files, and `/etc/ssh/ssh_config` for the user running DSH. It supports common Include globs, quoted paths, `~`, `%d`, `%%`, and `${VARIABLE}`. The themed picker supports search, selected markers, a scrollable list, arrow keys, Enter, Escape, and Tab. Use **刷新 SSH 列表** (Refresh SSH list) after editing config. Only concrete Host aliases are listed; wildcard/negated rules and known_hosts entries are not connections. It does not read private keys or evaluate Match/ProxyCommand during listing. Conditional Includes are scanned as candidates; OpenSSH resolves actual conditions on connection. Dynamic host-dependent Include tokens and other users’ `~user` paths are skipped with a warning; manual entry remains available. If DSH runs on a server, the list belongs to that server user, not the browser computer.
 
 ### Noninteractive Claude environment
 

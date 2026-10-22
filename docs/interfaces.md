@@ -31,3 +31,5 @@
 参考插件研究固定在提交 `cc7f3014016e5bc3cd7ce85050de04cf61069901`：process.ts、adapter.ts、permissions.ts、remote-fs.ts、client/picker.tsx、client/shared.ts 与 cordis.patch.yml。参考其 stdio 控制响应、AskUserQuestion 和远程工作区交互，独立实现绑定和 fail-closed 校验。
 
 Claude 协议来源：本机 CLI `2.1.304 --help` 只用于核对参数；运行时的检测和登录判断一律通过目标 SSH 用户执行。外部来源包括 [官方 CLI reference](https://code.claude.com/docs/en/cli-reference) 和 [官方 Python Agent SDK 的控制协议实现](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py)。CLI stdio 控制协议随版本可能变化，运行时拒绝不支持的参数或不识别的状态，不静默降级。
+
+0.1.3 下拉弹层通过公开 React DOM `createPortal` 挂载到 document.body；已核对 DSH 自带客户端模块同样使用 ModuleLoader 的 `react-dom` 外部模块。样式使用实际主题包中的 `--dsw-alias-bg-layer-*`、`--dsw-alias-label-*`、`--dsw-alias-border-*` 与交互颜色令牌，并提供回退颜色。

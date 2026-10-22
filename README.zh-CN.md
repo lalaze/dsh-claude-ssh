@@ -18,7 +18,7 @@ cd dsh-claude-ssh
 npm ci --registry=https://registry.npmjs.org
 npm run check
 npm pack
-dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.2.tgz
+dsh plugin --profile web add /绝对路径/dsh-claude-ssh-0.1.3.tgz
 ```
 
 安装到 **DSH 桌面端**：先打开应用一次以初始化 profile，完全退出后，将上述命令的 `--profile web` 改为 `--profile desktop` 执行，再重新打开桌面应用。
@@ -59,7 +59,7 @@ ssh -T -o BatchMode=yes -o StrictHostKeyChecking=yes my-dev-box 'id -un; pwd'
 
 本机也可以作为 SSH 目标，但需要先开启 SSH 服务并配置密钥认证。安装插件不会自动开启服务或更改 SSH 配置。本次开发环境的回环验收配置及卸载方法见[验证记录](docs/validation.md#本机-ssh-验收配置)。
 
-别名列表读取运行 DSH 用户的 `~/.ssh/config`、递归 Include 文件和 `/etc/ssh/ssh_config`；支持常见 Include 通配、双引号路径、`~`、`%d`、`%%` 和 `${变量}`。配置修改后点击“刷新 SSH 列表”。仅列出明确的 Host 别名，不将通配/否定规则或 known_hosts 记录当作连接；不读取私钥，也不在列表阶段执行 Match/ProxyCommand。条件 Include 中的条目会作为候选列出，最终条件由连接时的 OpenSSH 解析。依赖目标主机的动态 Include 令牌及其他用户的 `~user` 路径会提示跳过，仍可手动填写别名。若 DSH 运行在服务器上，读取的是该服务器用户的配置，不是浏览器所在电脑的配置。
+别名列表读取运行 DSH 用户的 `~/.ssh/config`、递归 Include 文件和 `/etc/ssh/ssh_config`；支持常见 Include 通配、双引号路径、`~`、`%d`、`%%` 和 `${变量}`。下拉面板支持搜索、选中标记、滚动列表，以及方向键、回车、Esc 和 Tab；样式随 DSH 深浅主题切换。配置修改后点击“刷新 SSH 列表”。仅列出明确的 Host 别名，不将通配/否定规则或 known_hosts 记录当作连接；不读取私钥，也不在列表阶段执行 Match/ProxyCommand。条件 Include 中的条目会作为候选列出，最终条件由连接时的 OpenSSH 解析。依赖目标主机的动态 Include 令牌及其他用户的 `~user` 路径会提示跳过，仍可手动填写别名。若 DSH 运行在服务器上，读取的是该服务器用户的配置，不是浏览器所在电脑的配置。
 
 ### Claude 的非交互环境
 
