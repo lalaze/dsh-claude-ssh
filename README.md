@@ -10,6 +10,7 @@ A pnpm workspace for independently versioned DeepSeek Harness plugins. Each plug
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.md) | Use remote Claude Code over system OpenSSH in DSH |
 | `dsh-usage-stats` | [packages/usage-stats](packages/usage-stats/README.md) | Track DSH and Claude SSH token usage with filters, grouped reports and CSV export |
+| `dsh-magpie-fast` | [packages/magpie-fast](packages/magpie-fast/README.md) | GPT-only lightning toggle for priority processing on existing providers, including remote Magpie |
 
 ## Setup
 
@@ -60,6 +61,7 @@ For Desktop, fully quit DSH and use `--profile desktop`, then reopen the app. Fo
 packages/
   claude-ssh/           # dsh-claude-ssh: source, tests, manifest, docs
   usage-stats/          # DSH and Claude SSH usage statistics
+  magpie-fast/          # GPT Fast composer toggle for existing providers
 scripts/
   build-client.mjs      # Shared DSH web client bundler
 tsconfig.base.json     # Shared TypeScript compiler options

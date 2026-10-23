@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.zh-CN.md) | 在 DSH 中通过系统 OpenSSH 使用远端 Claude Code |
 | `dsh-usage-stats` | [packages/usage-stats](packages/usage-stats/README.zh-CN.md) | 统计 DSH 模型与 Claude SSH 远端调用的 Token 用量，支持筛选、分组和 CSV 导出 |
+| `dsh-magpie-fast` | [packages/magpie-fast](packages/magpie-fast/README.zh-CN.md) | 仅 GPT 显示的闪电开关，沿用已有提供商为远端 Magpie 等请求开启 Fast |
 
 ## 初始化
 
@@ -60,6 +61,7 @@ dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.3.2.tgz"
 packages/
   claude-ssh/           # dsh-claude-ssh 的源码、测试、清单和文档
   usage-stats/          # DSH 与 Claude SSH 使用量统计
+  magpie-fast/          # 现有 GPT 模型的 Fast 闪电开关
 scripts/
   build-client.mjs      # 共用的 DSH Web 客户端打包脚本
 tsconfig.base.json     # 共用 TypeScript 编译选项
