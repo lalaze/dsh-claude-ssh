@@ -1,111 +1,493 @@
-import { LlmAdapter, type GenerateOptions, type ResolvedRetryPolicy, type StreamChunk } from '@deepseek-ai/dsh-llm';
-import type { Context } from '@deepseek-ai/cordis';
-import type {} from '@deepseek-ai/dsh-agent';
-import type {} from '@deepseek-ai/dsh-user-approval';
-import type {} from '@deepseek-ai/dsh-user-questions';
-import { SessionId } from '@deepseek-ai/dsh-session';
-import { label, providerFor, route, SshClaudeError } from './domain.js';
-import type { Store } from './store.js';
-import type { Ssh } from './ssh.js';
-import { allow, deny, questionAnswers, questions, type Frame } from './protocol.js';
-import { runTurn } from './runner.js';
+// dsh LLM adapter that drives the Claude Code CLI (`claude -p --input-format stream-json --output-format stream-json`).
+import { registerWorkspaceEligibility } from "./compatibility/routes.js";
+import { hostname } from "node:os";
+import { join } from "node:path";
+import { accountIdentity, readSshBoxes, registerSessionRoutes } from "./sessions.js";
+import { hub } from "./events.js";
+import { registerUsageRoute } from "./usage.js";
+import { registerMcpBridge } from "./mcp.js";
+import type { PluginContext, SessionController, SubprocessRuntime } from "./dsh.js";
+import { ADAPTER_CURRENT, COMMAND_CATALOG, RESUME_TIMER, WATCH_SWEEP } from "./dsh.js";
+import { loadStarted, loadCommandCatalog, STATE_DIR, trace } from "./state.js";
+import { type ToolMode } from "./rows-probe.js";
+import { errorText } from "./process.js";
+import { bindServerLocale } from "./locale.js";
+export { markBusy, takeInterrupted } from "./state.js";
+export { forkTranscriptText } from "./transcript.js";
+export { Translator, type TranslatorBlock, type FallbackRecord } from "./translator.js";
+import { Config, DSH_VERSION, setRemoteWorkspaces } from "./adapter/config.js";
+// The entry keeps its export list while the split runs.
+export {
+  boxFor,
+  Config,
+  isOrphanedStandIn,
+  localConfig,
+  remoteCwdFor,
+  remoteWorkspaceFor,
+  setRemoteWorkspaces,
+} from "./adapter/config.js";
 
-export const MODELS = ['sonnet', 'opus', 'haiku'] as const; // Claude Code's documented aliases, resolved remotely.
-export function promptOf(options: GenerateOptions, sentIds?: readonly string[]): string {
-  let last = -1;
-  for (let i = 0; i < options.messages.length; i++) if (options.messages[i].role === 'assistant') last = i;
-  const text: string[] = [];
-  for (const m of options.messages.slice(last + 1)) {
-    if (m.role !== 'user' || ('source' in m && m.source?.kind !== 'user')) continue;
-    if (sentIds) {
-      if (!('id' in m) || !m.id) throw new SshClaudeError('MESSAGE_ID_REQUIRED', '远程会话需要 DSH 持久消息标识，以防止任务重发。');
-      if (sentIds.includes(m.id)) continue;
-    }
-    for (const b of m.content) {
-      if (b.type !== 'text') throw new SshClaudeError('ATTACHMENT_UNSUPPORTED', '首版仅转发文本。请将文件放在远端项目中并提供远端路径；不自动上传本地附件。');
-      text.push(b.text);
-    }
+// The entry keeps its export list while the split runs.
+export {
+  type AsideEntry,
+  type AsidesReply,
+  type AwaitingRow,
+  type ControlReply,
+  type ContextUsageReply,
+  type HoldReply,
+  type IdleReply,
+  keepsLiveTurn,
+  type LoginNeed,
+  type LiveTurnReply,
+  type McpAuthReply,
+  type McpStatusReply,
+  type PermissionModeInfo,
+  type PermissionModeReply,
+  type PermissionModeState,
+  type PermissionReadoutReply,
+  registryKey,
+  type RewindPrompt,
+  type RewindReply,
+  skillDoctorReply,
+  type SkillDoctorReply,
+  type SteerCardState,
+  type SteerEditReply,
+  type TurnTotals,
+  type WorkspaceDiffReply,
+} from "./adapter/types.js";
+
+// The entry keeps its export list while the split runs.
+export {
+  EFFORTS_ALL,
+  getCatalog,
+  KNOWN_MODELS,
+  liveWindowFor,
+  mergeCatalog,
+  modelFromApi,
+  noteLiveWindow,
+  parseCatalogCache,
+  proxyBaseUrl,
+  resolveModelInfo,
+  stableModelId,
+} from "./adapter/catalog.js";
+
+import { NO_PROCESS_FOR_ASIDE, selectionContext } from "./adapter/asides.js";
+// The entry keeps its export list while the split runs.
+export { asideAnswerText, selectionContext } from "./adapter/asides.js";
+
+import { claudeSessionId, projectDirName } from "./adapter/transcript-watch.js";
+// The entry keeps its export list while the split runs.
+export { claudeSessionId, projectDirName } from "./adapter/transcript-watch.js";
+
+// The entry keeps its export list while the split runs.
+export {
+  attachmentNotes,
+  attachmentsOf,
+  buildPrompt,
+  clientTimeZone,
+  contextSizes,
+  contextSourceOf,
+  type LooseMessage,
+  relayFileHandles,
+  selectTurns,
+  steerKey,
+  withoutNativeInstructions,
+} from "./adapter/prompt.js";
+
+import { forgetCliProbe } from "./adapter/cli.js";
+// The entry keeps its export list while the split runs.
+export {
+  accessModeOf,
+  approvalsDisabled,
+  buildArgs,
+  buildInput,
+  commandNames,
+  denyCliFlag,
+  dshToolsGuidance,
+  type ExecLike,
+  forgetCliProbe,
+  mcpToolsByServer,
+  NATIVE_TOOL_MAP,
+  permissionModeFor,
+  probeCli,
+  renameTitle,
+  supports,
+  unknownFlagIn,
+  usesStdin,
+} from "./adapter/cli.js";
+
+import { diffContext, RESUME_DELAY_MS, WATCH_SWEEP_MS } from "./adapter/turn.js";
+// The entry keeps its export list while the split runs.
+export {
+  afterLastAssistant,
+  diffContext,
+  dropSent,
+  finishReason,
+  forgetSteers,
+  hasPendingTodo,
+  type IdleTarget,
+  interruptOnAbort,
+  isLoginFailure,
+  isOwnSource,
+  isStaleResume,
+  killAfterGrace,
+  LIMIT_TEXT,
+  type LiveTurn,
+  nativeToolRows,
+  noteInterrupt,
+  noticeSource,
+  OUTCOME_MESSAGE,
+  OWN_SOURCE_KIND,
+  RECONNECT_TEXT,
+  relayBlocks,
+  resolvedAgent,
+  RESTART_TEXT,
+  type ResultFrame,
+  type SideQuestion,
+  sideQuestionsIn,
+  stepContextFor,
+  toolResultFor,
+  type TurnRecord,
+  type TurnsReply,
+  type UltracodeState,
+  ultracodeStatus,
+  userPromptCount,
+  WAKE_TEXT,
+  wakeOnlyTurn,
+  wantedUltracode,
+} from "./adapter/turn.js";
+
+import { probeLogin, reconcileSshBoxes, type SshBoxMount } from "./adapter/ssh-boxes.js";
+import { ClaudeCodeAdapter } from "./adapter/class.js";
+// The entry keeps its export list while the split runs.
+export { ClaudeCodeAdapter } from "./adapter/class.js";
+
+/** Plugin name identifier. */
+export const name = "dsh-claude-ssh";
+/** Services injected into the plugin by the dsh runtime. */
+export const inject = ["llm", "sessions", "attachments", "agents", "approval", "userQuestions"];
+
+// Re-exported so tests that import from adapter.ts can reach it too.
+export { ADAPTER_CURRENT };
+
+/** The entry point dsh calls: build the adapter, register its provider and adapter, probe the login, and pin the instance on globalThis so a re-instantiation at boot shares the one already running. */
+export function apply(ctx: PluginContext, config: Schemastery.TypeT<typeof Config>) {
+  // Looked up on every read: `settings` is not in `inject`, so at apply it may not be mounted yet, and
+  // a reference taken now stays undefined for the life of the process (every header wrote English).
+  bindServerLocale({
+    describe: (options) => ctx.get("settings")?.describe?.(options) ?? [],
+  });
+  const adapter = new ClaudeCodeAdapter(ctx, config);
+  const claudeHome = adapter.claudeHome;
+  ctx.llm.registerConfigurableProviders([
+    {
+      provider: adapter.providerId,
+      displayName: adapter.displayName,
+      settingsNs: adapter.settingsNs,
+      settingsPath: [],
+    },
+  ]);
+  adapter.registration = ctx.llm.registerAdapter([adapter.providerId], adapter);
+  if (adapter.providerId !== "claude-code") probeLogin(adapter);
+  // dsh drops a session's Agent out of `ctx.agents` after a few idle minutes; the controller's
+  // resolveAgent() cold-resumes it, which is what a wake after a long idle needs.
+  ctx.inject?.(["sessionController"], (host) => {
+    // SAFETY: cordis hands services untyped; this key holds dsh's session controller
+    adapter.sessionController = host.sessionController as SessionController | undefined;
+  });
+  // One timer per dsh process, never tied to this cordis scope: dsh re-instantiates the plugin
+  // when settings apply at boot, and a scope-bound timer was disposed before it fired.
+  // SAFETY: the two symbols are this plugin's own keys on globalThis, typed here once
+  const g = globalThis as typeof globalThis & {
+    [ADAPTER_CURRENT]?: Map<string, ClaudeCodeAdapter>;
+    [RESUME_TIMER]?: ReturnType<typeof setTimeout>;
+    [WATCH_SWEEP]?: ReturnType<typeof setInterval>;
+    [COMMAND_CATALOG]?: string[];
+  };
+  (g[ADAPTER_CURRENT] ??= new Map()).set(adapter.providerId, adapter);
+  // Transcripts of loaded sessions go under watch now and on a timer, one per process like the
+  // resume timer, reading the newest adapters at each tick.
+  const sweep = () => {
+    for (const a of g[ADAPTER_CURRENT]?.values() ?? [])
+      void a.watchLoadedSessions().catch((e) => a.log("warn", `watch sweep: ${errorText(e)}`));
+  };
+  setTimeout(sweep, 5000).unref?.();
+  if (!g[WATCH_SWEEP]) {
+    g[WATCH_SWEEP] = setInterval(sweep, WATCH_SWEEP_MS);
+    g[WATCH_SWEEP].unref?.();
   }
-  if (!text.join('\n').trim()) throw new SshClaudeError('EMPTY_PROMPT', '没有可发送的用户文本；不会重放历史任务。');
-  return text.join('\n\n');
-}
-export class ClaudeSshAdapter extends LlmAdapter {
-  readonly active = new Map<string, AbortController>();
-  constructor(protected ctx: Context, readonly store: Store, readonly ssh: Ssh) { super(); }
-  override providerInfo(provider: string) {
-    const host = this.store.snapshot().hosts.find(h => providerFor(h.id) === provider);
-    return { id: provider, name: `Claude SSH / ${host?.name ?? '已删除主机'} / ${host?.destination ?? ''}` };
-  }
-  override providerRetryPolicy(): ResolvedRetryPolicy { return { mode: 'normal', maxRetries: 0, retryableCodes: [], initialDelayMs: 500, maxDelayMs: 500, jitterRatio: 0 }; }
-  override async listModels(provider: string) { return MODELS.map(id => ({ provider, id, name: `Claude SSH ${id}`, description: this.providerInfo(provider).name, inputModalities: ['text' as const] })); }
-  async decide(sessionId: string, identity: string, request: Frame, signal: AbortSignal): Promise<unknown> {
-    const id = String(request.tool_use_id ?? '');
-    const agent = this.ctx.agents.get(SessionId(sessionId));
-    if (!agent || request.subtype !== 'can_use_tool' || typeof request.tool_name !== 'string') return deny(id, 'Unsupported control request or unavailable DSH session');
-    const input = request.input;
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return deny(id, 'Invalid tool input');
-    if (request.tool_name === 'AskUserQuestion') {
-      const qs = questions(input, id);
-      const answer = await this.ctx.userQuestions.ask({ agent, questions: qs.map(q => ({ ...q, detail: identity })), signal });
-      return allow(id, { ...input, answers: questionAnswers(qs, answer) });
-    }
-    if (request.tool_name === 'ExitPlanMode' && typeof input.plan === 'string') {
-      const q = { id: `plan:${id}`, question: `批准此远端计划？${identity}`, detail: input.plan, options: [{ label: '批准' }, { label: '继续规划' }], intent: { kind: 'plan-review' as const, approve: '批准' } };
-      const answer = await this.ctx.userQuestions.ask({ agent, questions: [q], signal });
-      const a = answer.answers.find(a => a.id === q.id);
-      return a?.selected.length === 1 && a.selected[0] === '批准' && !a.custom ? allow(id, input) : deny(id, a?.custom || 'User chose to continue planning');
-    }
-    const outcome = await this.ctx.approval.request({ agent, toolName: `Claude SSH: ${request.tool_name}`, reason: `${identity}\n${JSON.stringify(input)}`, signal });
-    return outcome === 'allowed-once' && !signal.aborted ? allow(id, input) : deny(id, `DSH permission decision: ${outcome}`);
-  }
-  override async *stream(options: GenerateOptions): AsyncGenerator<StreamChunk> {
-    const sessionId = options.sessionId;
-    let entered = false;
-    let control: AbortController | undefined;
-    try {
-      if (options.purpose) throw new SshClaudeError('AUXILIARY_UNSUPPORTED', 'Claude SSH 不执行标题生成或本地上下文压缩辅助请求。');
-      const { host, binding } = route(this.store.snapshot(), sessionId, options.provider);
-      if (!MODELS.includes(options.model as typeof MODELS[number])) throw new SshClaudeError('BAD_MODEL', '请选择 sonnet、opus 或 haiku 别名。');
-      if (this.active.has(binding.sessionId)) throw new SshClaudeError('SESSION_BUSY', '同一会话已有远端任务。');
-      if (['interrupted', 'cancelled', 'running'].includes(binding.state)) throw new SshClaudeError('RECOVERY_REQUIRED', '上次任务已中断或状态未知。请先检查远端，再在 Claude SSH 中明确恢复；不会重发旧任务。');
-      const prompt = promptOf(options, binding.sentMessageIds ?? []);
-      const messageIds = options.messages.filter(m => m.role === 'user' && (!('source' in m) || m.source?.kind === 'user') && 'id' in m && m.id).map(m => 'id' in m ? String(m.id) : '');
-      control = new AbortController(); this.active.set(binding.sessionId, control);
-      const signal = options.signal ? AbortSignal.any([options.signal, control.signal]) : control.signal;
-      signal.throwIfAborted();
-      // Revalidate directory and remote identity every turn; never trust a previous probe.
-      const directory = await this.ssh.directory(host, binding.path, signal);
-      if (directory.path !== binding.path || directory.user !== binding.user) throw new SshClaudeError('BINDING_CHANGED', '远端目录真实路径或用户已变化，请创建新工作区。');
-      const probe = await this.ssh.probe(host, signal);
-      if (probe.user !== binding.user) throw new SshClaudeError('REMOTE_USER_CHANGED', '检测到远端用户变化，已停止。');
-      // Check immutable routing again after asynchronous SSH preflight.
-      route(this.store.snapshot(), sessionId, options.provider);
-      await this.store.update(s => {
-        const b = s.bindings[binding.sessionId];
-        b.state = 'running'; delete b.lastError;
-        b.sentMessageIds = [...new Set([...(b.sentMessageIds ?? []), ...messageIds])];
+  void adapter.adoptKeepers().catch((e) => adapter.log("warn", `keeper adoption: ${errorText(e)}`));
+  void adapter.adoptHolds().catch((e) => adapter.log("warn", `hold adoption: ${errorText(e)}`));
+  // A hot reload disposes the previous instance's command registrations with its scope and
+  // brings no new init frame; re-bridge from the catalog the last one saw.
+  if (g[COMMAND_CATALOG]) adapter.bridgeCommands(g[COMMAND_CATALOG], undefined);
+  // A restart has no globalThis to read and adopts the keeper it finds, so no init frame follows:
+  // the last catalog on disk is the only thing that puts the bridged commands back in the menu.
+  // It waits on the commands service: at plugin load that service is not mounted yet, and
+  // bridgeCommands answers nothing at all without it, which left the menu empty after a restart.
+  else
+    ctx.inject?.(["commands"], () => {
+      void loadCommandCatalog(adapter.stateDir).then((names) => {
+        if (names.length > 0) adapter.bridgeCommands(names, undefined);
       });
-      entered = true;
-      yield* runTurn(this.ssh, { host, binding, binary: probe.path, model: options.model, prompt, signal,
-        decide: (request, signal) => this.decide(binding.sessionId, label(host, binding), request, signal),
-        initialized: async () => { await this.store.update(s => { s.bindings[binding.sessionId].initialized = true; }); }
-      });
-      await this.store.update(s => { s.bindings[binding.sessionId].state = 'completed'; });
-      entered = false;
-      yield { type: 'finish', reason: { kind: 'stop' } };
-    } catch (error) {
-      const cancelled = options.signal?.aborted || control?.signal.aborted || error instanceof SshClaudeError && error.code === 'CANCELLED';
-      const message = error instanceof Error ? error.message : 'Claude SSH 未知错误';
-      if (entered && sessionId) {
-        await this.store.update(s => { const b = s.bindings[sessionId]; b.state = cancelled ? 'cancelled' : 'interrupted'; b.lastError = message; });
-        entered = false;
-      }
-      yield { type: 'finish', reason: { kind: cancelled ? 'aborted' : 'error', failure: { code: error instanceof SshClaudeError ? error.code : 'CLAUDE_SSH_ERROR', message } } };
-    } finally {
-      // A consumer that abandons the generator is also an interruption, never a success.
-      if (entered && sessionId) await this.store.update(s => { s.bindings[sessionId].state = 'interrupted'; s.bindings[sessionId].lastError = '流已关闭，结果未知；请检查远端后恢复。'; });
-      if (sessionId && this.active.get(sessionId) === control) this.active.delete(sessionId);
-    }
+    });
+  if (!g[RESUME_TIMER]) {
+    g[RESUME_TIMER] = setTimeout(() => {
+      // Resume every mounted instance over its own busy file.
+      for (const inst of g[ADAPTER_CURRENT]?.values() ?? [])
+        inst
+          .resumeInterrupted(join(inst.stateDir, "busy.json"))
+          .catch((e) => trace(`resume after restart failed: ${errorText(e)}`));
+    }, RESUME_DELAY_MS);
+    g[RESUME_TIMER].unref?.();
+    void trace("timer armed");
   }
-  cancelAll(): void { for (const controller of this.active.values()) controller.abort(); }
+  // Optional: the subprocess seam (stock dsh mounts a local provider; a community one can be remote).
+  ctx.inject?.(["subprocess"], (host) => {
+    // SAFETY: cordis hands services untyped; dsh's subprocess seam is what this key holds
+    adapter.subprocess = host.subprocess as Pick<SubprocessRuntime, "spawn"> | undefined;
+  });
+  ctx.inject?.(["permissionPresets"], (host) => {
+    // SAFETY: cordis hands services untyped and the host type lacks this optional one;
+    // dsh-permission-presets exposes current(session) returning the preset name
+    const services = host as { permissionPresets?: { current: (session: object) => string } };
+    adapter.permissionPresets = services.permissionPresets;
+  });
+  // Routes, MCP bridge, usage route and the client panel are registered once per process: only
+  // the default instance owns them. A non-default mount logs an info line and skips registration.
+  if (adapter.providerId !== "claude-code") {
+    adapter.log("info", "panel/routes/usage belong to the default claude-code instance");
+  } else {
+    registerWorkspaceEligibility(ctx);
+    // The SSH boxes the default instance mounts. `sshMounts` is scope-local (rebuilt each apply, since
+    // a hot reload disposes the registrations); `sshAdapters` is the shared registry the resume walks.
+    const sshMounts = new Map<string, SshBoxMount>();
+    const sshAdapters = (g[ADAPTER_CURRENT] ??= new Map());
+    registerMcpBridge(ctx, {
+      keyFile: join(STATE_DIR, "mcp.key"),
+      log: (level, msg) => adapter.log(level, msg),
+      version: "0.9.0",
+      // The bridge is mounted once; a session on a box's model runs under that box's instance, so
+      // the offer has to reach that mount's live turn (see ownerFor).
+      relay: (sessionId, toolName, args, signal) =>
+        adapter.ownerFor(sessionId).relay(sessionId, toolName, args, signal),
+    }).then(
+      (mcp) => {
+        adapter.mcp = mcp;
+      },
+      (e) => adapter.log("warn", `mcp bridge unavailable: ${errorText(e)}`),
+    );
+    // Build a provider→box lookup from the registry so the usage route reads the right login: a
+    // second local instance's own dir, or an ssh box's own `~/.claude` over ssh.
+    const usageBoxFor = (
+      providerId: string,
+    ): { home: string; sshHost?: string; realHome: string; command: string } | undefined => {
+      const other = g[ADAPTER_CURRENT]?.get(providerId);
+      return other
+        ? {
+            home: other.claudeHome,
+            sshHost: other.config.sshHost || undefined,
+            realHome: other.realClaudeHome,
+            command: other.config.command,
+          }
+        : undefined;
+    };
+    // The same registry answers the session routes: a request that names its session's mount reads
+    // that mount's box, so a session on an SSH box stops being reported as this one.
+    // The same registry by host, for a read about a remote workspace: its files are on its box
+    // whichever model the session runs, so the box is found by hostname rather than by provider id.
+    const instanceForHost = (host: string) => {
+      for (const other of g[ADAPTER_CURRENT]?.values() ?? [])
+        if (other.config.sshHost === host)
+          return { configDir: other.claudeHome, command: other.config.command, sshHost: host };
+      return undefined;
+    };
+    const instanceFor = (providerId: string | null) => {
+      const other = providerId === null ? undefined : g[ADAPTER_CURRENT]?.get(providerId);
+      if (other === undefined) return undefined;
+      return {
+        configDir: other.claudeHome,
+        command: other.config.command,
+        sshHost: other.config.sshHost,
+      };
+    };
+    registerUsageRoute(
+      ctx,
+      (level, msg) => adapter.log(level, msg),
+      (home?: string, sshHost?: string) =>
+        accountIdentity(adapter.config.command, home, sshHost ?? adapter.config.sshHost),
+      {
+        home: claudeHome,
+        realHome: adapter.realClaudeHome,
+        command: adapter.config.command,
+        boxFor: usageBoxFor,
+      },
+    );
+    registerSessionRoutes(ctx, {
+      log: (level: string, msg: string) => adapter.log(level, msg),
+      onHeal: (heal) => {
+        adapter.heal = heal;
+      },
+      // With the transcript switch on, `claudeHome` is the plugin's own mirror: its `projects/` is
+      // where dsh-started sessions land, and the real `~/.claude/projects` is read alongside it so
+      // a session started from a terminal is still listed and still opens.
+      projectDir: (cwd: string) =>
+        [...new Set([claudeHome, adapter.realClaudeHome])].map((home) =>
+          join(home, "projects", projectDirName(cwd)),
+        ),
+      projectsDir: [...new Set([claudeHome, adapter.realClaudeHome])].map((home) =>
+        join(home, "projects"),
+      ),
+      startedIds: loadStarted,
+      claudeIdOf: claudeSessionId,
+      settingsPath: join(claudeHome, "settings.json"),
+      configDir: claudeHome,
+      boxesPath: join(STATE_DIR, "boxes.json"),
+      importedDir: join(STATE_DIR, "imported"),
+      sshBoxesPath: join(STATE_DIR, "ssh-boxes.json"),
+      onSshBoxes: (boxes) =>
+        reconcileSshBoxes(ctx, config, boxes, sshMounts, sshAdapters, (level, msg) =>
+          adapter.log(level, msg),
+        ),
+      remoteWorkspacesPath: join(STATE_DIR, "remote-workspaces.json"),
+      onRemoteWorkspaces: setRemoteWorkspaces,
+      command: adapter.config.command,
+      boxCommand: adapter.configuredCommand,
+      sshHost: adapter.config.sshHost,
+      instanceFor,
+      instanceForHost,
+      onLoginStatus: (id, loggedIn) =>
+        g[ADAPTER_CURRENT]?.get(id ?? adapter.providerId)?.setLoggedIn(loggedIn),
+      turnRecords: adapter.turnBuffer,
+      dshVersion: DSH_VERSION,
+      liveTurn: adapter.liveTurn,
+      events: {
+        hub,
+        snapshot: (session: string | null) => adapter.snapshot(session),
+        replies: {
+          liveTurn: (sessionId: string) => adapter.liveTurnReply(sessionId),
+          turns: (sessionId: string) => adapter.turnsReply(sessionId),
+          asides: (sessionId: string) => adapter.asidesReply(sessionId),
+          idle: (sessionId: string) => adapter.idleReply(sessionId),
+          permissionMode: (sessionId: string) => adapter.permissionModeReply(sessionId),
+        },
+      },
+      idle: {
+        deadlineFor: (session: string) =>
+          adapter.ownerFor(session).idleDeadlineMap.get(session) ?? null,
+        extend: (session: string) => adapter.ownerFor(session).extendIdle(session),
+        timeoutMs: adapter.config.idleTimeoutMs,
+      },
+      toolMode: {
+        info: () => adapter.toolModeInfo(),
+        set: (mode: ToolMode) => adapter.setToolMode(mode),
+      },
+      terminalSync: {
+        info: () => adapter.terminalSyncInfo(),
+        set: (enabled: boolean) => adapter.setTerminalSync(enabled),
+      },
+      // Everything below is about one session's own process or its own state, so it runs on the
+      // mount that owns that session rather than on this one: these routes are registered once,
+      // by the default mount, and a session on a box's model lives under the box's instance.
+      permissionModes: {
+        info: (sessionId: string) => adapter.ownerFor(sessionId).permissionModeInfo(sessionId),
+        set: (sessionId: string, mode: string | null) =>
+          adapter.ownerFor(sessionId).setPermissionMode(sessionId, mode),
+        restore: (sessionId: string, mode: string) =>
+          adapter.ownerFor(sessionId).restorePermissionMode(sessionId, mode),
+      },
+      contextUsage: (sessionId: string) => adapter.ownerFor(sessionId).contextUsage(sessionId),
+      skillDoctor: (sessionId: string) => adapter.ownerFor(sessionId).skillDoctor(sessionId),
+      workspaceDiff: (sessionId: string) => adapter.ownerFor(sessionId).workspaceDiff(sessionId),
+      permissionReadout: (sessionId: string) =>
+        adapter.ownerFor(sessionId).permissionReadout(sessionId),
+      mcp: {
+        status: (sessionId: string) => adapter.ownerFor(sessionId).mcpStatus(sessionId),
+        reconnect: (sessionId: string, serverName: string) =>
+          adapter.ownerFor(sessionId).mcpReconnect(sessionId, serverName),
+        ask: (sessionId: string, serverName: string, ask: boolean) =>
+          adapter.ownerFor(sessionId).setMcpAsk(sessionId, serverName, ask),
+        authenticate: (sessionId: string, serverName: string) =>
+          adapter.ownerFor(sessionId).mcpAuthenticate(sessionId, serverName),
+      },
+      rewind: (sessionId: string, uuid: string, dryRun: boolean) =>
+        adapter.ownerFor(sessionId).rewind(sessionId, uuid, dryRun),
+      permissionAsks: adapter.permissionAsks,
+      // Once a second per open session: a live process names its mount; without one there are no
+      // waiting steers, and a held one sits on the mount that took it, which is this one when
+      // nothing else is live.
+      steersFor: (sessionId: string) =>
+        (adapter.ownerIfLive(sessionId) ?? adapter).steersFor(sessionId),
+      holdSteers: (sessionId: string, ids: string[]) =>
+        adapter.ownerFor(sessionId).holdSteers(sessionId, ids),
+      sendSteerNow: (sessionId: string, ids: string[]) =>
+        adapter.ownerFor(sessionId).sendSteerNow(sessionId, ids),
+      releaseHold: (
+        sessionId: string,
+        holdId: string,
+        how: "restore" | "drop" | { text: string },
+      ) => adapter.ownerFor(sessionId).releaseHold(sessionId, holdId, how),
+      askAside: async (sessionId: string, question: string, seed) => {
+        const owner = adapter.ownerFor(sessionId);
+        // Liveness is settled here, not left to askSideQuestion, which would write its own error into
+        // the ring: a recap nobody typed must not leave an error bubble on a session with no process
+        // and nothing to respawn one from. An evicted process is respawned now, so the diff below
+        // has a process to ask. The Ask control shows the error in its own note line instead.
+        if (!(await owner.revive(sessionId))?.alive)
+          return { ok: false, error: NO_PROCESS_FOR_ASIDE };
+        let context: string | undefined;
+        if (seed.withDiff) {
+          const diff = await owner.workspaceDiff(sessionId);
+          if (!diff.ok) return { ok: false, error: diff.error };
+          context = diffContext(diff, seed.path);
+        } else if (seed.quote !== "") context = selectionContext(seed.quote);
+        owner.askSideQuestion(sessionId, question, context, seed.quote);
+        return { ok: true };
+      },
+      sideQuestions: adapter.sideQuestions,
+      loginNeeded: adapter.loginNeeded,
+      sessionFallbacks: adapter.sessionFallbacks,
+      boxOfSession: (sid) => {
+        const label = adapter.hostLabelFor(sid);
+        return { host: label ?? "", label: label ?? hostname() };
+      },
+      claudeUpdated: forgetCliProbe,
+      loginDone: (host: string) => adapter.loginDone(host),
+      logoutDone: (host: string) => adapter.logoutBox(host),
+      liveCount: (host: string) => adapter.liveCount(host),
+      persistAsides: (sessionId: string) => adapter.persistAsides(sessionId),
+      starters: adapter.starters,
+      setStarter: (key: string, text: string | undefined) => {
+        adapter.setStarter(key, text);
+      },
+      thinking: {
+        info: (sessionId: string) => adapter.ownerFor(sessionId).thinkingInfo(sessionId),
+        set: (sessionId: string, tokens: number | null) =>
+          adapter.ownerFor(sessionId).setThinkingBudget(sessionId, tokens),
+      },
+      models: () => adapter.getAdvisorModels(),
+      providerId: adapter.providerId,
+      reloadPlugins: (sessionId: string) => adapter.ownerFor(sessionId).reloadPlugins(sessionId),
+      reloadSkills: (sessionId: string) => adapter.ownerFor(sessionId).reloadSkills(sessionId),
+      pluginErrors: (sessionId: string) => adapter.ownerFor(sessionId).pluginErrorsFor(sessionId),
+      pluginWarnings: (sessionId: string) =>
+        adapter.ownerFor(sessionId).pluginWarningsFor(sessionId),
+      liveTasks: (sessionId: string) => adapter.ownerFor(sessionId).liveTasksFor(sessionId),
+      stopTask: (sessionId: string, taskId: string) =>
+        adapter.ownerFor(sessionId).stopTask(sessionId, taskId),
+      taskOutput: (sessionId: string, taskId: string) =>
+        adapter.ownerFor(sessionId).taskOutput(sessionId, taskId),
+      compactNow: (sessionId: string) => adapter.ownerFor(sessionId).compactNow(sessionId),
+      awaiting: () => adapter.awaitingAll(),
+      continueAfterLimit: adapter.config.continueAfterLimit,
+    });
+    // Mount the saved SSH boxes at boot; `sshMounts` is scope-local so a hot reload rebuilds them.
+    void readSshBoxes(join(STATE_DIR, "ssh-boxes.json"))
+      .then((boxes) =>
+        reconcileSshBoxes(ctx, config, boxes, sshMounts, sshAdapters, (l, m) => adapter.log(l, m)),
+      )
+      .catch((e) => adapter.log("warn", `ssh boxes: ${errorText(e)}`));
+    // The remote-workspace redirects are fed by the routes above (`onRemoteWorkspaces`), seed read
+    // included: one feed on one chain, so a row the reconcile dropped cannot be read back in here.
+  }
 }

@@ -4,6 +4,8 @@
 
 用于开发多个 DeepSeek Harness 插件的 pnpm 大仓。每个插件独立维护包名、版本、清单、源码、测试、文档和安装包。
 
+**其中 `dsh-claude-ssh` 是基于 [Oh My Claude](https://github.com/lcestou/dsh-oh-my-claude) 1.5.5 修改的版本。** 本插件沿用上游的 Claude Code 接入实现，在此基础上增加远程工作区验证与路由、按工作区显示模型，以及 DSH 兼容性修复。感谢 Oh My Claude 作者提供原始实现。具体上游提交、许可与署名见[来源说明](packages/claude-ssh/UPSTREAM.md)和[第三方声明](packages/claude-ssh/THIRD_PARTY_NOTICES.md)。
+
 | 插件 | 目录 | 功能 |
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.zh-CN.md) | 在 DSH 中通过系统 OpenSSH 使用远端 Claude Code |
@@ -36,11 +38,10 @@ pnpm pack:plugins   # 构建并打包，产物集中到 dist/
 
 ```sh
 pnpm --filter dsh-claude-ssh check
-pnpm --filter dsh-claude-ssh test:ui
 pnpm --filter dsh-claude-ssh pack:plugin
 ```
 
-`test:ui` 需要 `agent-browser` 和 Chrome/Chromium，浏览器路径配置见[插件文档](packages/claude-ssh/README.zh-CN.md#开发与验收)。
+Claude 的 check 包含模板回归与远程工作区兼容测试。离线测试和真实运行验收的区别见[插件文档](packages/claude-ssh/README.zh-CN.md#开发与验收)。
 
 ## 安装插件
 
@@ -48,7 +49,7 @@ pnpm --filter dsh-claude-ssh pack:plugin
 
 ```sh
 pnpm pack:plugins
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.1.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.3.2.tgz"
 ```
 
 桌面端请完全退出 DSH，将参数改为 `--profile desktop` 后安装并重新打开。Web 端请重启更新的 profile 并刷新浏览器。插件目前未发布到 npm。仓库根目录是私有工作区，安装时应使用各插件的压缩包。

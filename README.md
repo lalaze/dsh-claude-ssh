@@ -4,6 +4,8 @@
 
 A pnpm workspace for independently versioned DeepSeek Harness plugins. Each plugin has its own manifest, source, tests, documentation, and installable package.
 
+**`dsh-claude-ssh` is a modified version of [Oh My Claude](https://github.com/lcestou/dsh-oh-my-claude), based on upstream version 1.5.5.** It retains the upstream Claude Code integration and adds verified remote-workspace routing, workspace-specific model visibility, and compatibility fixes for DSH. Thanks to the Oh My Claude authors for the original implementation. See [upstream provenance](packages/claude-ssh/UPSTREAM.md) and [third-party notices](packages/claude-ssh/THIRD_PARTY_NOTICES.md) for the exact revision and attribution.
+
 | Package | Directory | Description |
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.md) | Use remote Claude Code over system OpenSSH in DSH |
@@ -36,11 +38,10 @@ Work on one plugin with a package filter:
 
 ```sh
 pnpm --filter dsh-claude-ssh check
-pnpm --filter dsh-claude-ssh test:ui
 pnpm --filter dsh-claude-ssh pack:plugin
 ```
 
-`test:ui` requires `agent-browser` and Chrome/Chromium. See the [plugin documentation](packages/claude-ssh/README.md#development-and-validation) for browser configuration.
+Claude's check includes the upstream regression suite and remote-workspace compatibility checks. See the [plugin documentation](packages/claude-ssh/README.md#development-and-validation) for the distinction between offline tests and live verification.
 
 ## Installation
 
@@ -48,7 +49,7 @@ Install an individual built archive into the desired DSH profile:
 
 ```sh
 pnpm pack:plugins
-dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.2.1.tgz"
+dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.3.2.tgz"
 ```
 
 For Desktop, fully quit DSH and use `--profile desktop`, then reopen the app. For Web, restart the updated profile and refresh the browser. Plugins are not currently published to npm. The repository root is a private workspace; install individual plugin archives rather than the GitHub root.
