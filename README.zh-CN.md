@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.zh-CN.md) | 在 DSH 中通过系统 OpenSSH 使用远端 Claude Code |
 | `dsh-usage-stats` | [packages/usage-stats](packages/usage-stats/README.zh-CN.md) | 统计 DSH 模型与 Claude SSH 远端调用的 Token 用量，支持筛选、分组和 CSV 导出 |
+| `dsh-gallery` | [packages/gallery](packages/gallery/README.zh-CN.md) | 图库与 DSH 背景：Bing 每日壁纸、本地上传、固定壁纸、大图预览和背景效果调节 |
 | `dsh-magpie-fast` | [packages/magpie-fast](packages/magpie-fast/README.zh-CN.md) | 仅 GPT 显示的闪电开关，沿用已有提供商为远端 Magpie 等请求开启 Fast |
 
 ## 初始化
@@ -53,7 +54,7 @@ pnpm pack:plugins
 dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.3.2.tgz"
 ```
 
-桌面端请完全退出 DSH，将参数改为 `--profile desktop` 后安装并重新打开。Web 端请重启更新的 profile 并刷新浏览器。插件目前未发布到 npm。仓库根目录是私有工作区，安装时应使用各插件的压缩包。
+桌面端请完全退出 DSH，使用桌面应用自带的 `dsh` 命令，将参数改为 `--profile desktop` 后安装并重新打开；npm 版 CLI 不能管理这个保留 profile。Web 端请重启更新的 profile 并刷新浏览器。插件目前未发布到 npm。仓库根目录是私有工作区，安装时应使用各插件的压缩包。
 
 ## 目录与新增插件
 
@@ -61,6 +62,7 @@ dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.3.2.tgz"
 packages/
   claude-ssh/           # dsh-claude-ssh 的源码、测试、清单和文档
   usage-stats/          # DSH 与 Claude SSH 使用量统计
+  gallery/              # 本地图库、Bing 每日壁纸与 DSH 背景
   magpie-fast/          # 现有 GPT 模型的 Fast 闪电开关
 scripts/
   build-client.mjs      # 共用的 DSH Web 客户端打包脚本

@@ -10,6 +10,7 @@ A pnpm workspace for independently versioned DeepSeek Harness plugins. Each plug
 | --- | --- | --- |
 | `dsh-claude-ssh` | [packages/claude-ssh](packages/claude-ssh/README.md) | Use remote Claude Code over system OpenSSH in DSH |
 | `dsh-usage-stats` | [packages/usage-stats](packages/usage-stats/README.md) | Track DSH and Claude SSH token usage with filters, grouped reports and CSV export |
+| `dsh-gallery` | [packages/gallery](packages/gallery/README.md) | Bing daily wallpapers, local uploads, pinned backgrounds and image previews for DSH |
 | `dsh-magpie-fast` | [packages/magpie-fast](packages/magpie-fast/README.md) | GPT-only lightning toggle for priority processing on existing providers, including remote Magpie |
 
 ## Setup
@@ -53,7 +54,7 @@ pnpm pack:plugins
 dsh plugin --profile web add "$PWD/dist/dsh-claude-ssh-0.3.2.tgz"
 ```
 
-For Desktop, fully quit DSH and use `--profile desktop`, then reopen the app. For Web, restart the updated profile and refresh the browser. Plugins are not currently published to npm. The repository root is a private workspace; install individual plugin archives rather than the GitHub root.
+For Desktop, fully quit DSH and use the desktop application's bundled `dsh` command with `--profile desktop`, then reopen the app; the npm CLI cannot manage this reserved profile. For Web, restart the updated profile and refresh the browser. Plugins are not currently published to npm. The repository root is a private workspace; install individual plugin archives rather than the GitHub root.
 
 ## Layout and new plugins
 
@@ -61,6 +62,7 @@ For Desktop, fully quit DSH and use `--profile desktop`, then reopen the app. Fo
 packages/
   claude-ssh/           # dsh-claude-ssh: source, tests, manifest, docs
   usage-stats/          # DSH and Claude SSH usage statistics
+  gallery/              # Local wallpaper library and DSH backgrounds
   magpie-fast/          # GPT Fast composer toggle for existing providers
 scripts/
   build-client.mjs      # Shared DSH web client bundler
