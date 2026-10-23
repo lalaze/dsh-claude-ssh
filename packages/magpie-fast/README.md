@@ -8,17 +8,24 @@ The plugin uses the existing provider, model ID, endpoint, credentials and reaso
 
 ## Install
 
-Requires Node.js ≥ 22.19 and DSH `>=0.2.1-rc.2 <0.3.0`. From the workspace root:
+Requires Node.js ≥ 22.19 and DSH `>=0.2.1-rc.2 <0.3.0`. Build the archive on the target machine, from the workspace root:
 
 ```sh
-pnpm --filter dsh-magpie-fast check
+pnpm install --frozen-lockfile
 pnpm --filter dsh-magpie-fast pack:plugin
-dsh plugin --profile web add "$PWD/dist/dsh-magpie-fast-0.1.0.tgz"
 ```
 
-Restart that Web profile and refresh its browser. Select your original GPT model and click the lightning button. Remote Magpie uses the gateway key already configured on that provider.
+For Desktop, fully quit DSH and use the desktop application's bundled `dsh` command from the workspace root, then reopen the app:
 
-For Desktop, fully quit the application, install the same archive through its own plugin manager, and reopen it. Some standalone CLI versions reject management of the reserved `desktop` profile.
+```sh
+dsh plugin --profile desktop add "$PWD/dist/dsh-magpie-fast-0.1.1.tgz"
+```
+
+The standalone npm CLI cannot manage the reserved `desktop` profile. Alternatively, enter the archive's absolute path in Desktop's Settings → Plugins → Add plugin → Install third-party plugin, then restart. Web users can install the same archive with `--profile web`, restart that profile and refresh the browser.
+
+Select your original GPT model and click the lightning button. Remote Magpie uses the gateway key already configured on that provider.
+
+Since `0.1.1`, the plugin resolves the OpenAI implementation already owned by DSH's `dsh-llm-pi-ai` adapter. The archive no longer depends on the complete `pi-ai` package, so installing it does not add Google SDK, `protobufjs`, or build-script approvals for those packages. The source retains `pi-ai` as a development dependency for type checking only.
 
 ## Behavior and configuration
 
@@ -47,6 +54,10 @@ pnpm --filter dsh-magpie-fast test:ui
 pnpm --filter dsh-magpie-fast preview:ui
 ```
 
-The demo binds to `0.0.0.0` and opens at `http://100.96.195.115:4184/`. It uses fixture data. Automated tests cover both wire protocols, priority injection, reasoning, tools, usage/replay, session isolation, persistence/reload failures, unchanged provider registration, and the real UI component's keyboard, theme and narrow-screen behavior. No tests call a paid model or prove that an upstream actually granted priority service.
+The demo binds to `0.0.0.0` and opens at `http://100.96.195.115:4184/`. It uses fixture data.
+
+`check` also installs the actual archive offline into an empty profile with strict dependency-build policy, verifies that no complete `pi-ai`, Google SDK or `protobufjs` is added, then exercises both priority-enabled wire protocols from the installed archive using only host-owned implementations.
+
+Automated tests also cover reasoning, tools, usage/replay, session isolation, persistence/reload failures, unchanged provider registration, and the real UI component's keyboard, theme and narrow-screen behavior. No tests call a paid model or prove that an upstream actually granted priority service.
 
 MIT.

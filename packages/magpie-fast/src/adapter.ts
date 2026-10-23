@@ -1,14 +1,31 @@
 import { Context } from '@deepseek-ai/cordis';
+import { readFile } from 'node:fs/promises';
+import { findPackageJSON } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import type { FetchFunction, Provider, ProviderRequestOptions, ProviderStreams } from '@earendil-works/pi-ai';
-import * as chat from '@earendil-works/pi-ai/api/openai-completions';
-import * as responses from '@earendil-works/pi-ai/api/openai-responses';
-import { LlmRuntime, resolveRetryPolicy } from '@deepseek-ai/dsh-llm';
+import { LlmError, LlmRuntime, resolveRetryPolicy } from '@deepseek-ai/dsh-llm';
 import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm';
 import { credentialRef } from '@deepseek-ai/dsh-credentials';
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai';
 import type { PiAiAdapterOptions, ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai';
 import { materializeModels } from './models.js';
 import { isGpt, record, type Protocol, type SourceProvider } from './config.js';
+
+// Resolve public pi-ai entry points from the adapter that owns the runtime dependency.
+// A profile need not install another copy of pi-ai or its unrelated provider SDKs.
+const hostModule = import.meta.resolve('@deepseek-ai/dsh-llm-pi-ai');
+async function providerApi(protocol: Protocol): Promise<ProviderStreams> {
+  const manifestPath = findPackageJSON('@earendil-works/pi-ai', hostModule);
+  const manifest = manifestPath ? record(JSON.parse(await readFile(manifestPath, 'utf8'))) : undefined;
+  const exports = record(manifest?.exports);
+  const entry = exports?.[`./api/${protocol}`] ?? exports?.['./api/*'];
+  const target = typeof entry === 'string' ? entry : record(entry)?.import ?? record(entry)?.default;
+  if (!manifestPath || typeof target !== 'string' || !target.startsWith('./')) {
+    throw new LlmError('当前 DSH 内置 pi-ai 未提供所需的 OpenAI API 入口，请更新 DSH', 'UNSUPPORTED_HOST_RUNTIME');
+  }
+  // pi-ai's public export map is ESM-only; require.resolve cannot select it.
+  return import(new URL(target.replaceAll('*', protocol), pathToFileURL(manifestPath)).href);
+}
 
 export function requestOptions(options: ProviderRequestOptions | undefined, model: string, fetch?: FetchFunction): ProviderRequestOptions {
   return { ...options, ...(fetch ? { fetch } : {}), onPayload: async (body, info) => {
@@ -41,7 +58,7 @@ export class FastPool {
     const existing = this.entries.get(signature);
     if (existing) { this.entries.delete(signature); this.entries.set(signature, existing); return existing; }
     const { models, caps } = materializeModels(captured);
-    const api: ProviderStreams = captured.profile.api === 'openai-responses' ? responses : chat;
+    const api = await providerApi(captured.profile.api === 'openai-responses' ? 'openai-responses' : 'openai-completions');
     const provider: Provider<Protocol> = {
       id: captured.id, name: captured.profile.displayName ?? captured.id, baseUrl: captured.profile.baseURL,
       auth: { apiKey: { name: 'Gateway API key', resolve: async () => ({ auth: { apiKey: key } }) } },

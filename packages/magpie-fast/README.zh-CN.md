@@ -8,17 +8,24 @@
 
 ## 安装
 
-需要 Node.js ≥ 22.19、DSH `>=0.2.1-rc.2 <0.3.0`。从本仓库根目录构建并安装到 Web profile：
+需要 Node.js ≥ 22.19、DSH `>=0.2.1-rc.2 <0.3.0`。在安装插件的机器上，从本仓库根目录打包：
 
 ```sh
-pnpm --filter dsh-magpie-fast check
+pnpm install --frozen-lockfile
 pnpm --filter dsh-magpie-fast pack:plugin
-dsh plugin --profile web add "$PWD/dist/dsh-magpie-fast-0.1.0.tgz"
 ```
 
-重启该 Web profile 并刷新浏览器。在已有会话中选择原来的 Magpie GPT 模型，点击工具栏上的闪电即可。远端 Magpie 继续使用该提供商原有的网关密钥；无需另填地址或重复导入模型。
+桌面版先完全退出 DSH，在仓库根目录使用桌面应用自带的 `dsh` 命令安装，再重新打开：
 
-桌面端需完全退出后，通过该桌面应用所用的插件管理入口安装同一压缩包，再重新打开。部分新版本的独立 `dsh` CLI 不允许管理保留的 `desktop` profile，请使用桌面应用自己的插件安装入口。
+```sh
+dsh plugin --profile desktop add "$PWD/dist/dsh-magpie-fast-0.1.1.tgz"
+```
+
+独立 npm CLI 不允许管理保留的 `desktop` profile。也可在桌面版「设置 → 插件 → 添加插件 → 安装第三方插件」中填写该压缩包的绝对路径，安装后重启。Web 版使用 `--profile web` 安装同一压缩包，然后重启该 profile 并刷新浏览器。
+
+在已有会话中选择原来的 Magpie GPT 模型，点击工具栏上的闪电即可。远端 Magpie 继续使用该提供商原有的网关密钥；无需另填地址或重复导入模型。
+
+从 `0.1.1` 起，插件通过 DSH 的 `dsh-llm-pi-ai` 适配器复用其已安装的 OpenAI 实现。安装包不再依赖完整的 `pi-ai`，不会为本插件额外安装 Google SDK、`protobufjs` 或要求批准它们的安装脚本。源码中的 `pi-ai` 开发依赖仅用于类型检查。
 
 ## 行为
 
@@ -55,6 +62,8 @@ pnpm --filter dsh-magpie-fast preview:ui
 
 最后一条启动演示界面，地址为 `http://100.96.195.115:4184/`，服务绑定 `0.0.0.0`。演示不读取真实会话或调用模型。
 
-自动化覆盖最终 HTTP 请求中的 priority、Chat/Responses 两种协议、推理强度、流式文本和工具调用、用量与回放、会话隔离、状态保存失败与重载、原提供商目录保持不变，以及界面显示、持久化、键盘与浅深色/窄屏。测试使用模拟 API，不代表真实上游已经授予 priority 服务。
+`check` 同时验证实际安装包：在空目录中使用严格脚本策略离线安装，确认没有新增完整 `pi-ai`、Google SDK 或 `protobufjs`，再从已安装的压缩包复用宿主实现，验证 Chat/Responses 请求都携带 priority。
+
+自动化还覆盖推理强度、流式文本和工具调用、用量与回放、会话隔离、状态保存失败与重载、原提供商目录保持不变，以及界面显示、持久化、键盘与浅深色/窄屏。测试使用模拟 API，不代表真实上游已经授予 priority 服务。
 
 MIT。

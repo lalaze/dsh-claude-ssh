@@ -1,6 +1,6 @@
 {
   "name": "dsh-magpie-fast",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A GPT-only lightning toggle for priority processing on existing DSH providers, including remote Magpie",
   "type": "module",
   "main": "lib/server/index.js",
@@ -24,9 +24,10 @@
     "build": "tsc -p tsconfig.build.json && node ../../scripts/build-client.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "check": "pnpm run typecheck && pnpm test && pnpm run build",
+    "check": "pnpm run typecheck && pnpm test && pnpm run test:package",
     "prepack": "pnpm run build",
     "pack:plugin": "pnpm pack --pack-destination ../../dist",
+    "test:package": "pnpm run pack:plugin && node --import tsx --test test/package/*.test.ts",
     "test:ui": "node scripts/test-fast-ui.mjs",
     "preview:ui": "node scripts/preview-fast.mjs"
   },
@@ -59,9 +60,6 @@
         "@deepseek-ai/dsh-client-ui-model-selection"
       ]
     }
-  },
-  "dependencies": {
-    "@earendil-works/pi-ai": "1.3.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.5",
@@ -112,6 +110,7 @@
     }
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "1.3.0",
     "@deepseek-ai/cordis": "~4.0.5",
     "@deepseek-ai/dsh-attachment": "0.2.1-rc.2",
     "@deepseek-ai/dsh-credentials": "0.2.1-rc.2",
