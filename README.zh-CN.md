@@ -12,6 +12,7 @@
 | `dsh-usage-stats` | [packages/usage-stats](packages/usage-stats/README.zh-CN.md) | 统计 DSH 模型与 Claude SSH 远端调用的 Token 用量，支持筛选、分组和 CSV 导出 |
 | `dsh-gallery` | [packages/gallery](packages/gallery/README.zh-CN.md) | 图库与 DSH 背景：Bing 每日壁纸、本地上传、固定壁纸、大图预览和背景效果调节 |
 | `dsh-magpie-fast` | [packages/magpie-fast](packages/magpie-fast/README.zh-CN.md) | 仅 GPT 显示的闪电开关，沿用已有提供商为远端 Magpie 等请求开启 Fast |
+| `dsh-magpie-quota` | [packages/magpie-quota](packages/magpie-quota/README.zh-CN.md) | 输入框旁的账号额度图标、窗口明细、重置时间和单账号刷新 |
 
 ## 初始化
 
@@ -64,6 +65,7 @@ packages/
   usage-stats/          # DSH 与 Claude SSH 使用量统计
   gallery/              # 本地图库、Bing 每日壁纸与 DSH 背景
   magpie-fast/          # 现有 GPT 模型的 Fast 闪电开关
+  magpie-quota/         # Magpie 各账号额度图标与详情
 scripts/
   build-client.mjs      # 共用的 DSH Web 客户端打包脚本
 tsconfig.base.json     # 共用 TypeScript 编译选项
